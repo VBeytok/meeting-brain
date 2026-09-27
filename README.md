@@ -9,7 +9,7 @@ pnpm monorepo.
 
 ## Setup
 
-Requires Node 24+ and pnpm (`corepack enable` picks up the pinned version).
+Requires Node 24+ and pnpm (`corepack enable pnpm` puts the pinned version on PATH).
 
 ```bash
 pnpm install

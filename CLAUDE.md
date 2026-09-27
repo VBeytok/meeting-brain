@@ -14,7 +14,7 @@ pnpm --filter @meeting-brain/api <script>
 pnpm --filter @meeting-brain/web add <dep>      # add deps per app, never at the root
 ```
 
-If `pnpm` is not on PATH, use `corepack pnpm` (the version is pinned in `package.json#packageManager`).
+If `pnpm` is not on PATH, run `corepack enable pnpm` once (the version is pinned in `package.json#packageManager`). Calling `corepack pnpm <script>` is not enough: root scripts run `pnpm -r` internally and fail with `pnpm: command not found`.
 
 A change is done when `pnpm lint && pnpm typecheck && pnpm test && pnpm format:check` passes.
 
