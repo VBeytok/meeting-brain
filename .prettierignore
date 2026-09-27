@@ -1,0 +1,13 @@
+node_modules
+pnpm-lock.yaml
+dist
+coverage
+.next
+out
+build
+next-env.d.ts
+.idea
+.agents
+.aider-desk
+.claude
+skills-lock.json

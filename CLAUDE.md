@@ -1,0 +1,43 @@
+# meeting-brain
+
+pnpm monorepo with two apps; each has its own `CLAUDE.md` with app-specific rules.
+
+- `apps/web`: `@meeting-brain/web`, Next.js, port 3000
+- `apps/api`: `@meeting-brain/api`, NestJS, port 3001
+
+## Commands
+
+Run from the repo root. Root scripts fan out to every app; target one app with its package name:
+
+```bash
+pnpm --filter @meeting-brain/api <script>
+pnpm --filter @meeting-brain/web add <dep>      # add deps per app, never at the root
+```
+
+If `pnpm` is not on PATH, use `corepack pnpm` (the version is pinned in `package.json#packageManager`).
+
+A change is done when `pnpm lint && pnpm typecheck && pnpm test && pnpm format:check` passes.
+
+## Keeping docs current
+
+Architecture changes ship with their doc updates in the same change. Architecture means: adding, removing or renaming an app or package; changing ports, env vars, scripts, or how apps talk to each other; swapping or reconfiguring tooling (lint, format, test, build); introducing a convention every future change must follow.
+
+When one of these lands, update every doc it makes stale: this file, the affected `apps/*/CLAUDE.md`, and `README.md`. Remove lines that are no longer true rather than appending corrections. The change is done when every one of those docs matches the code.
+
+## Tooling conventions
+
+- **Prettier** is configured once, at the root (`.prettierrc.json`, `.prettierignore`). Apps carry no Prettier config or dependency. A Claude Code hook (`.claude/hooks/format.sh`) formats every file after Write/Edit; files changed through Bash still need `pnpm format`.
+- **ESLint** is per app (`apps/*/eslint.config.mjs`), each ending with `eslint-config-prettier`. Stays on ESLint 9: `eslint-config-next` pulls `eslint-plugin-react`, which does not support ESLint 10 yet.
+- Packages with install scripts must be approved in `pnpm-workspace.yaml` under `allowBuilds`.
+
+## Project skills
+
+Skills live in `.claude/skills/`, installed with the `skills` CLI and tracked in `skills-lock.json`. Add new ones with `npx skills add <repo> --skill <name> -a claude-code -y`; without `-a claude-code` they land in `.agents/skills/`, which Claude Code does not read. Update with `npx skills update`.
+
+Read the matching `SKILL.md` before the work it covers:
+
+- NestJS code in `apps/api`: `nestjs-best-practices`
+- React / Next.js code in `apps/web`: `vercel-react-best-practices`
+- HeroUI components: `heroui-react`
+- Committing: `git-commit`
+- Finishing a feature, before merge: `requesting-code-review`
