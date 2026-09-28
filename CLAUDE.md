@@ -4,6 +4,7 @@ pnpm monorepo with two apps; each has its own `CLAUDE.md` with app-specific rule
 
 - `apps/web`: `@meeting-brain/web`, Next.js, port 3000
 - `apps/api`: `@meeting-brain/api`, NestJS, port 3001
+- Postgres 18: `docker-compose.yml` at the root, host port 5432. Start with `docker compose up -d --wait`. Connection: `postgresql://meeting_brain:meeting_brain@localhost:5432/meeting_brain`; env overrides `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`.
 
 ## Commands
 

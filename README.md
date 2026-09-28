@@ -15,6 +15,17 @@ Requires Node 24+ and pnpm (`corepack enable pnpm` puts the pinned version on PA
 pnpm install
 ```
 
+## Database
+
+Postgres 18 runs in Docker via `docker-compose.yml`:
+
+```bash
+docker compose up -d --wait   # start (data persists in the postgres-data volume)
+docker compose down           # stop (add -v to wipe data)
+```
+
+Connection: `postgresql://meeting_brain:meeting_brain@localhost:5432/meeting_brain`. If another local Postgres holds 5432, stop it or set `POSTGRES_PORT`. Override credentials with `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB`.
+
 ## Scripts (from the repo root)
 
 ```bash
