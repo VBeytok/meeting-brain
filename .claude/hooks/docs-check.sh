@@ -35,7 +35,8 @@ hits=$(printf '%s\n' "$changed" | grep -E \
   -e '\.guard\.ts$' \
   -e '(^|/)(eslint\.config\.[cm]?js|\.prettierrc[^/]*|\.prettierignore|tsconfig[^/]*\.json|vitest\.config[^/]*|nest-cli\.json|next\.config\.[^/]+|prisma[^/]*\.config\.ts)$' \
   -e '^\.claude/(settings\.json|hooks/)' \
-  -e '^skills-lock\.json$')
+  -e '^skills-lock\.json$' \
+  -e '^\.mcp\.json$')
 
 [ -z "$hits" ] && exit 0
 

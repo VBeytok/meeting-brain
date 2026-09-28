@@ -23,16 +23,16 @@ A change is done when `pnpm lint && pnpm typecheck && pnpm test && pnpm format:c
 
 Docs ship in the same commit as the change that makes them stale. Before committing, audit every doc the map names for the files you touched: add what is missing, delete what is no longer true (no appended corrections). Done means every named doc matches the code.
 
-| Files touched                                                   | Docs to audit                                                                |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `package.json` (scripts, deps), `pnpm-workspace.yaml`           | README Setup + Scripts; this file's Commands; `apps/*/CLAUDE.md`             |
-| `.env.example`, `apps/api/src/config/`, `src/main.ts`           | `apps/api/CLAUDE.md` Environment; README Setup                               |
-| `docker-compose.yml`, `apps/api/prisma/**`, `prisma*.config.ts` | README Setup + Database; this file's app list; `apps/api/CLAUDE.md` Database |
-| `*.module.ts` (new or removed feature)                          | `apps/api/CLAUDE.md` Modules                                                 |
-| `*.controller.ts`, `**/dto/**`, `*.guard.ts`                    | README API endpoints; `apps/api/CLAUDE.md` Auth                              |
-| lint, format, test, build or TS config                          | this file's Tooling conventions; the app's `CLAUDE.md`; README Scripts       |
-| `.claude/settings.json`, `.claude/hooks/`, `skills-lock.json`   | this file                                                                    |
-| a new rule every future change must follow                      | this file or the app's `CLAUDE.md`, wherever it applies                      |
+| Files touched                                                              | Docs to audit                                                                |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `package.json` (scripts, deps), `pnpm-workspace.yaml`                      | README Setup + Scripts; this file's Commands; `apps/*/CLAUDE.md`             |
+| `.env.example`, `apps/api/src/config/`, `src/main.ts`                      | `apps/api/CLAUDE.md` Environment; README Setup                               |
+| `docker-compose.yml`, `apps/api/prisma/**`, `prisma*.config.ts`            | README Setup + Database; this file's app list; `apps/api/CLAUDE.md` Database |
+| `*.module.ts` (new or removed feature)                                     | `apps/api/CLAUDE.md` Modules                                                 |
+| `*.controller.ts`, `**/dto/**`, `*.guard.ts`                               | README API endpoints; `apps/api/CLAUDE.md` Auth                              |
+| lint, format, test, build or TS config                                     | this file's Tooling conventions; the app's `CLAUDE.md`; README Scripts       |
+| `.claude/settings.json`, `.claude/hooks/`, `skills-lock.json`, `.mcp.json` | this file                                                                    |
+| a new rule every future change must follow                                 | this file or the app's `CLAUDE.md`, wherever it applies                      |
 
 The `.claude/hooks/docs-check.sh` hook enforces this: a `git commit` touching mapped files is blocked until the message has a `Docs-Checked:` trailer naming the docs audited (or `Docs-Checked: none needed, <why>`).
 
@@ -53,6 +53,12 @@ Work on a branch off `main`; open a PR with `gh pr create --base main`.
   - `## How to test`: exact commands, including setup a reviewer needs (env file, `docker compose up`, migrations).
   - `## Notes`: decisions a reviewer should question, known gaps, breaking changes. Omit if empty.
 - **Before opening:** the done-check passes; if `apps/api` changed, `pnpm --filter @meeting-brain/api test:e2e` passes too.
+
+## MCP servers
+
+Project MCP servers live in `.mcp.json` (add with `claude mcp add --scope project <name> -- <command>`); Claude Code asks each user to approve them on first use.
+
+- `playwright` (`npx @playwright/mcp@latest`): drives a real browser. Use it to check `apps/web` pages against the running dev server.
 
 ## Project skills
 
