@@ -31,6 +31,18 @@ When one of these lands, update every doc it makes stale: this file, the affecte
 - **ESLint** is per app (`apps/*/eslint.config.mjs`), each ending with `eslint-config-prettier`. Stays on ESLint 9: `eslint-config-next` pulls `eslint-plugin-react`, which does not support ESLint 10 yet.
 - Packages with install scripts must be approved in `pnpm-workspace.yaml` under `allowBuilds`.
 
+## Pull requests
+
+Work on a branch off `main`; open a PR with `gh pr create --base main`.
+
+- **Title:** a Conventional Commit, `<type>(<scope>): <description>`. Scope is the app (`api`, `web`) or omitted for repo-wide changes. Imperative mood, under 72 characters. For a multi-commit branch, name the main change (usually the `feat`/`fix`), not the chores around it.
+- **Description:** write it from `git log main..HEAD` and `git diff main...HEAD`, not from memory. Sections:
+  - `## Summary`: what the PR does and why, 1-3 sentences.
+  - `## Changes`: bullets grouped by area (endpoints, data model, tooling, docs). Name new env vars, scripts, migrations and dependencies.
+  - `## How to test`: exact commands, including setup a reviewer needs (env file, `docker compose up`, migrations).
+  - `## Notes`: decisions a reviewer should question, known gaps, breaking changes. Omit if empty.
+- **Before opening:** the done-check passes; if `apps/api` changed, `pnpm --filter @meeting-brain/api test:e2e` passes too.
+
 ## Project skills
 
 Skills live in `.claude/skills/`, installed with the `skills` CLI and tracked in `skills-lock.json`. Add new ones with `npx skills add <repo> --skill <name> -a claude-code -y`; without `-a claude-code` they land in `.agents/skills/`, which Claude Code does not read. Update with `npx skills update`.
