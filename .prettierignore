@@ -11,3 +11,4 @@ next-env.d.ts
 .aider-desk
 .claude
 skills-lock.json
+apps/api/src/generated

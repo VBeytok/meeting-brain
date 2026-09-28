@@ -9,6 +9,45 @@ The package is ESM (`"type": "module"`, `module: nodenext`):
 - Relative imports end in `.js`: `import { AppService } from './app.service.js'`.
 - Package subpaths without an `exports` map also need `.js`: `supertest/types.js`.
 
+## Environment
+
+`.env` (gitignored; copy `.env.example`). Validated at startup by `src/config/env.ts`; add new vars there and to `.env.example`.
+
+- `DATABASE_URL`: required. Postgres from the root `docker-compose.yml`.
+- `JWT_SECRET`: required. Signs access tokens.
+- `JWT_EXPIRES_IN`: optional, default `1h`.
+
+Read config through `ConfigService<Env, true>`, not `process.env`.
+
+## Database (Prisma 7)
+
+- Schema: `prisma/schema.prisma`; migrations: `prisma/migrations/`. Tables and columns are snake_case via `@@map` / `@map`.
+- CLI config is `prisma7.config.ts`, not the default name, so every Prisma command needs `--config prisma7.config.ts`. The package scripts pass it.
+- The client is generated into `src/generated/prisma/` (gitignored, excluded from lint and Prettier). `postinstall` regenerates it; after a schema change run `pnpm db:generate`. Import from `../generated/prisma/client.js`, never `@prisma/client`.
+- Inject `PrismaService` (from `PrismaModule`) instead of creating clients.
+
+```bash
+pnpm --filter @meeting-brain/api db:migrate --name <change>  # create + apply a migration (dev)
+pnpm --filter @meeting-brain/api db:deploy                   # apply pending migrations
+pnpm --filter @meeting-brain/api db:generate                 # regenerate the client
+```
+
+## Validation
+
+A global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`) is registered as `APP_PIPE` in `AppModule`, not in `main.ts`, so e2e tests get it too. Request bodies are `class-validator` DTOs.
+
+## Auth
+
+`POST /auth/register` and `POST /auth/login` return `{ accessToken }`, a JWT with `sub` (user id) and `email`. Passwords are hashed with scrypt (`src/auth/password-hasher.ts`).
+
+## CQRS
+
+Use-cases go through `@nestjs/cqrs` (`CqrsModule.forRoot()` in `AppModule`); controllers only build a command or query and hand it to `CommandBus` / `QueryBus`.
+
+- Command (changes state): `src/<feature>/commands/<name>/<name>.command.ts` + `<name>.handler.ts`, e.g. `RegisterUserCommand`.
+- Query (reads only): `src/<feature>/queries/<name>/<name>.query.ts` + `<name>.handler.ts`, e.g. `LoginQuery`.
+- Extend `Command<Result>` / `Query<Result>` so `execute()` is typed. Register handlers in the feature module's `providers`.
+
 ## Generating code
 
 Use the Nest CLI so modules are wired into `AppModule`:
@@ -22,7 +61,7 @@ pnpm --filter @meeting-brain/api exec nest g resource <name>
 Vitest, not Jest, with globals on (`describe`, `it`, `expect`, `vi`).
 
 - Unit: `src/**/*.spec.ts`, next to the code under test. `pnpm test`.
-- E2E: `test/*.e2e-spec.ts`. `pnpm test:e2e` (not part of the root `pnpm test`).
+- E2E: `test/*.e2e-spec.ts`. `pnpm test:e2e` (not part of the root `pnpm test`). Hits the real database from `.env`: Postgres must be up and migrated. Use unique emails per test instead of cleaning tables.
 
 ## Lint
 

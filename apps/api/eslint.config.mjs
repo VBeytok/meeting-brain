@@ -5,7 +5,7 @@ import prettier from 'eslint-config-prettier/flat';
 import globals from 'globals';
 
 export default defineConfig([
-  globalIgnores(['dist/**', 'coverage/**']),
+  globalIgnores(['dist/**', 'coverage/**', 'src/generated/**']),
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {
