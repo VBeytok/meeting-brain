@@ -2,10 +2,10 @@
 
 pnpm monorepo.
 
-| App                  | Path       | Stack   | Dev URL               |
-| -------------------- | ---------- | ------- | --------------------- |
-| `@meeting-brain/web` | `apps/web` | Next.js | http://localhost:3000 |
-| `@meeting-brain/api` | `apps/api` | NestJS  | http://localhost:3001 |
+| App                  | Path       | Stack           | Dev URL               |
+| -------------------- | ---------- | --------------- | --------------------- |
+| `@meeting-brain/web` | `apps/web` | Next.js         | http://localhost:3000 |
+| `@meeting-brain/api` | `apps/api` | NestJS + Prisma | http://localhost:3001 |
 
 ## Setup
 
@@ -52,6 +52,15 @@ pnpm lint           # ESLint in every app (lint:fix to autofix)
 pnpm typecheck      # tsc --noEmit in every app
 pnpm test           # unit tests
 pnpm format         # Prettier write (format:check for CI)
+```
+
+API-only scripts (need Postgres running, see Setup):
+
+```bash
+pnpm --filter @meeting-brain/api test:e2e      # end-to-end tests against the database in apps/api/.env
+pnpm --filter @meeting-brain/api db:migrate --name <change>   # create + apply a migration
+pnpm --filter @meeting-brain/api db:deploy     # apply pending migrations
+pnpm --filter @meeting-brain/api db:generate   # regenerate the Prisma client
 ```
 
 Prettier is configured once at the root (`.prettierrc.json`); each app has its own `eslint.config.mjs`.

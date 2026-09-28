@@ -9,6 +9,15 @@ The package is ESM (`"type": "module"`, `module: nodenext`):
 - Relative imports end in `.js`: `import { AppService } from './app.service.js'`.
 - Package subpaths without an `exports` map also need `.js`: `supertest/types.js`.
 
+## Modules
+
+- `config/`: env validation (`validateEnv`, `Env` type).
+- `prisma/`: `PrismaModule` / `PrismaService`, the only database client.
+- `users/`: `UsersService`, data access for the `users` table.
+- `auth/`: register and login (CQRS), `PasswordHasher`, `AccessTokenService`.
+
+Data access lives in one injectable per table; CQRS handlers call it, never `PrismaService` directly.
+
 ## Environment
 
 `.env` (gitignored; copy `.env.example`). Validated at startup by `src/config/env.ts`; add new vars there and to `.env.example`.
@@ -16,6 +25,7 @@ The package is ESM (`"type": "module"`, `module: nodenext`):
 - `DATABASE_URL`: required. Postgres from the root `docker-compose.yml`.
 - `JWT_SECRET`: required. Signs access tokens.
 - `JWT_EXPIRES_IN`: optional, default `1h`.
+- `PORT`: optional, default `3001`. Read directly in `src/main.ts`, not validated.
 
 Read config through `ConfigService<Env, true>`, not `process.env`.
 
@@ -50,10 +60,10 @@ Use-cases go through `@nestjs/cqrs` (`CqrsModule.forRoot()` in `AppModule`); con
 
 ## Generating code
 
-Use the Nest CLI so modules are wired into `AppModule`:
+Create a feature module with the Nest CLI so it is wired into `AppModule`, then add the controller, commands and queries by hand (see CQRS). Not `nest g resource`: it generates a CRUD service that bypasses CQRS.
 
 ```bash
-pnpm --filter @meeting-brain/api exec nest g resource <name>
+pnpm --filter @meeting-brain/api exec nest g module <name>
 ```
 
 ## Tests
