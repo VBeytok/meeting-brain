@@ -22,7 +22,11 @@ export class MeetingsRepository {
   }
 
   async findAllByOwner(ownerId: string): Promise<MeetingDto[]> {
-    const meetings = await this.prisma.meeting.findMany({ where: { ownerId } });
+    const meetings = await this.prisma.meeting.findMany({
+      where: { ownerId },
+      // ids are UUIDv7, so they break date ties in creation order.
+      orderBy: [{ date: 'asc' }, { id: 'asc' }],
+    });
     return meetings.map(toDto);
   }
 

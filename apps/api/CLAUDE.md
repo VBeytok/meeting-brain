@@ -24,7 +24,7 @@ Data access lives in one injectable per table; CQRS handlers call it, never `Pri
 `.env` (gitignored; copy `.env.example`). Validated at startup by `src/config/env.ts`; add new vars there and to `.env.example`.
 
 - `DATABASE_URL`: required. Postgres from the root `docker-compose.yml`.
-- `JWT_SECRET`: required. Signs access tokens.
+- `JWT_SECRET`: required. Signs access tokens. Must be at least 32 characters when `NODE_ENV=production`.
 - `JWT_EXPIRES_IN`: optional, default `1h`. A number with a unit (`s`, `m`, `h`, `d`); a bare number is rejected because jsonwebtoken would read it as milliseconds.
 - `PORT`: optional, default `3001`. Read directly in `src/main.ts`, not validated.
 
@@ -32,7 +32,7 @@ Read config through `ConfigService<Env, true>`, not `process.env`.
 
 ## Database (Prisma 7)
 
-- Schema: `prisma/schema.prisma`; migrations: `prisma/migrations/`. Tables and columns are snake_case via `@@map` / `@map`.
+- Schema: `prisma/schema.prisma`; migrations: `prisma/migrations/`. Tables and columns are snake_case via `@@map` / `@map`. Every `DateTime` column is `@db.Timestamptz(3)`.
 - CLI config is `prisma7.config.ts`, not the default name, so every Prisma command needs `--config prisma7.config.ts`. The package scripts pass it.
 - The client is generated into `src/generated/prisma/` (gitignored, excluded from lint and Prettier). `postinstall` regenerates it; after a schema change run `pnpm db:generate`. Import from `../generated/prisma/client.js`, never `@prisma/client`.
 - Inject `PrismaService` (from `PrismaModule`) instead of creating clients.

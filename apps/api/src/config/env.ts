@@ -7,6 +7,9 @@ export type Env = {
 const REQUIRED = ['DATABASE_URL', 'JWT_SECRET'] as const;
 
 // jsonwebtoken reads a bare number string as milliseconds, so a unit is required.
+// Enforced only in production, so the .env.example placeholder works locally.
+const MIN_PRODUCTION_SECRET_LENGTH = 32;
+
 const EXPIRES_IN = /^\d+[smhd]$/;
 
 // Fails at startup instead of on the first request that needs a missing value.
@@ -14,6 +17,15 @@ export function validateEnv(raw: Record<string, unknown>): Env {
   const missing = REQUIRED.filter((key) => typeof raw[key] !== 'string' || raw[key] === '');
   if (missing.length > 0) {
     throw new Error(`Missing required env vars: ${missing.join(', ')}`);
+  }
+
+  if (
+    raw.NODE_ENV === 'production' &&
+    (raw.JWT_SECRET as string).length < MIN_PRODUCTION_SECRET_LENGTH
+  ) {
+    throw new Error(
+      `JWT_SECRET must be at least ${MIN_PRODUCTION_SECRET_LENGTH} characters in production`,
+    );
   }
 
   const expiresIn =

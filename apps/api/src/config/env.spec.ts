@@ -16,6 +16,16 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ ...REQUIRED, JWT_EXPIRES_IN: value })).toThrow(/JWT_EXPIRES_IN/);
   });
 
+  it('rejects a JWT_SECRET shorter than 32 characters in production', () => {
+    expect(() => validateEnv({ ...REQUIRED, NODE_ENV: 'production' })).toThrow(/JWT_SECRET/);
+  });
+
+  it('accepts a 32-character JWT_SECRET in production', () => {
+    const env = { ...REQUIRED, NODE_ENV: 'production', JWT_SECRET: 'x'.repeat(32) };
+
+    expect(validateEnv(env).JWT_SECRET).toBe('x'.repeat(32));
+  });
+
   it('rejects a missing JWT_SECRET', () => {
     expect(() => validateEnv({ DATABASE_URL: REQUIRED.DATABASE_URL })).toThrow(/JWT_SECRET/);
   });

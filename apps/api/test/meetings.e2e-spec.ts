@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
@@ -63,6 +65,38 @@ describe('Meetings (e2e)', () => {
       await listMeetings('not-a-jwt').expect(401);
     });
 
+    it('accepts the bearer scheme in any case', async () => {
+      const token = await signUp();
+
+      await request(app.getHttpServer())
+        .get('/meetings')
+        .set('Authorization', `bearer ${token}`)
+        .expect(200);
+    });
+
+    it('rejects an expired token', async () => {
+      const { sub, email } = new JwtService().decode<{ sub: string; email: string }>(
+        await signUp(),
+      );
+      const secret = app.get(ConfigService).getOrThrow<string>('JWT_SECRET');
+      const expired = new JwtService({ secret }).sign({
+        sub,
+        email,
+        exp: Math.floor(Date.now() / 1000) - 60,
+      });
+
+      await listMeetings(expired).expect(401);
+    });
+
+    it('rejects a token signed with another secret', async () => {
+      const { sub, email } = new JwtService().decode<{ sub: string; email: string }>(
+        await signUp(),
+      );
+      const foreign = new JwtService({ secret: 'some-other-secret' }).sign({ sub, email });
+
+      await listMeetings(foreign).expect(401);
+    });
+
     it('rejects a token with a forged signature', async () => {
       const [header, payload] = (await signUp()).split('.');
 
@@ -112,6 +146,18 @@ describe('Meetings (e2e)', () => {
       ['participants that is not an array', { ...NEW_MEETING, participants: 'alice' }],
       ['a participant that is not a string', { ...NEW_MEETING, participants: ['alice', 42] }],
       ['an empty participant', { ...NEW_MEETING, participants: ['alice', ''] }],
+      ['a blank title', { ...NEW_MEETING, title: '   ' }],
+      ['a title longer than 200 characters', { ...NEW_MEETING, title: 't'.repeat(201) }],
+      ['a blank participant', { ...NEW_MEETING, participants: ['alice', '  '] }],
+      [
+        'a participant longer than 254 characters',
+        { ...NEW_MEETING, participants: ['p'.repeat(255)] },
+      ],
+      [
+        'more than 100 participants',
+        { ...NEW_MEETING, participants: Array.from({ length: 101 }, (_, i) => `p${i}`) },
+      ],
+      ['an unknown property', { ...NEW_MEETING, ownerId: randomUUID() }],
     ])('rejects %s', async (_case, body) => {
       const token = await signUp();
 
@@ -144,6 +190,21 @@ describe('Meetings (e2e)', () => {
       expect(meetings).toEqual(
         expect.arrayContaining([expect.objectContaining(first), expect.objectContaining(second)]),
       );
+    });
+
+    it('orders meetings by date, earliest first', async () => {
+      const token = await signUp();
+      for (const date of ['2026-10-03T09:00:00Z', '2026-10-01T09:00:00Z', '2026-10-02T09:00:00Z']) {
+        await createdMeeting(token, { ...NEW_MEETING, date });
+      }
+
+      const res = await listMeetings(token).expect(200);
+
+      expect((res.body as Meeting[]).map((m) => m.date)).toEqual([
+        '2026-10-01T09:00:00.000Z',
+        '2026-10-02T09:00:00.000Z',
+        '2026-10-03T09:00:00.000Z',
+      ]);
     });
 
     it("does not return other users' meetings", async () => {

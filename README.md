@@ -38,7 +38,7 @@ The API talks to it through Prisma; schema and migrations live in `apps/api/pris
 | POST   | `/auth/register` | `{ email, password }` | `201 { accessToken }` | `400` invalid input, `409` email taken |
 | POST   | `/auth/login`    | `{ email, password }` | `200 { accessToken }` | `400` invalid input, `401` bad creds   |
 
-`accessToken` is an HS256 JWT with `sub` (user id) and `email`. Passwords need at least 8 characters. Emails are case-insensitive and stored lowercased.
+`accessToken` is an HS256 JWT with `sub` (user id) and `email`. Passwords need 8 to 128 characters. Emails are at most 254 characters, case-insensitive and stored lowercased.
 
 Meeting routes need `Authorization: Bearer <accessToken>` (`401` without a valid one) and only see the caller's own meetings:
 
@@ -48,7 +48,7 @@ Meeting routes need `Authorization: Bearer <accessToken>` (`401` without a valid
 | GET    | `/meetings`     |                                           | `200` meeting[] |                                               |
 | GET    | `/meetings/:id` |                                           | `200` meeting   | `404` missing, not yours, or id is not a UUID |
 
-A meeting is `{ id, title, date, participants }`; `date` is an ISO 8601 date-time with an offset (`Z` or `±hh:mm`, e.g. `2026-10-01T10:00:00+02:00`) and comes back in UTC.
+A meeting is `{ id, title, date, participants }`; `date` is an ISO 8601 date-time with an offset (`Z` or `±hh:mm`, e.g. `2026-10-01T10:00:00+02:00`) and comes back in UTC. `title` is 1 to 200 characters; `participants` holds at most 100 entries of up to 254 characters; neither may be blank. `GET /meetings` returns meetings ordered by `date`, earliest first. Unknown body properties are rejected with `400`.
 
 ## Scripts (from the repo root)
 

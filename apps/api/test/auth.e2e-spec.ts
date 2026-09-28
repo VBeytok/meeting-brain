@@ -85,6 +85,12 @@ describe('Auth (e2e)', () => {
       ['invalid email', { email: 'not-an-email', password: PASSWORD }],
       ['missing password', { email: uniqueEmail() }],
       ['password shorter than 8 characters', { email: uniqueEmail(), password: 'short' }],
+      ['password longer than 128 characters', { email: uniqueEmail(), password: 'p'.repeat(129) }],
+      [
+        'email longer than 254 characters',
+        { email: `${'a'.repeat(250)}@example.com`, password: PASSWORD },
+      ],
+      ['an unknown property', { email: uniqueEmail(), password: PASSWORD, role: 'admin' }],
     ])('rejects %s', async (_case, body) => {
       await register(body).expect(400);
     });

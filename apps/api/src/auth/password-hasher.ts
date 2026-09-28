@@ -26,6 +26,7 @@ export class PasswordHasher {
     if (prefix !== PREFIX || !salt || !key) return false;
 
     const expected = Buffer.from(key, 'base64');
+    if (expected.length !== KEY_BYTES) return false;
     const actual = await scryptAsync(password, Buffer.from(salt, 'base64'), expected.length);
     return timingSafeEqual(actual, expected);
   }
