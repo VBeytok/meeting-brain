@@ -18,6 +18,14 @@ docker compose up -d --wait
 pnpm --filter @meeting-brain/api db:deploy   # apply migrations
 ```
 
+The web app reaches the API at `http://localhost:3001`; set `API_URL` (e.g. in `apps/web/.env.local`) to point it elsewhere.
+
+## Web pages
+
+| Path        | What it does                                                                                   |
+| ----------- | ---------------------------------------------------------------------------------------------- |
+| `/register` | Sign-up form; calls `POST /auth/register`, stores the token in an httpOnly cookie, goes to `/` |
+
 ## Database
 
 Postgres 18 runs in Docker via `docker-compose.yml`:
