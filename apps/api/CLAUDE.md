@@ -14,9 +14,10 @@ The package is ESM (`"type": "module"`, `module: nodenext`):
 - `config/`: env validation (`validateEnv`, `Env` type).
 - `prisma/`: `PrismaModule` / `PrismaService`, the only database client.
 - `users/`: `UsersService`, data access for the `users` table.
-- `auth/`: register and login (CQRS), `PasswordHasher`, `AccessTokenService`.
+- `auth/`: register and login (CQRS), `PasswordHasher`, `AccessTokenService`, and `JwtAuthGuard` / `@CurrentUser()` for other modules.
+- `meetings/`: create, list and get the caller's meetings (CQRS); `MeetingsRepository`, data access for the `meetings` table.
 
-Data access lives in one injectable per table; CQRS handlers call it, never `PrismaService` directly.
+Data access lives in one injectable per table; CQRS handlers call it, never `PrismaService` directly. Name new ones `<Feature>Repository` (`UsersService` predates this).
 
 ## Environment
 
