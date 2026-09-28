@@ -31,4 +31,9 @@ describe('PasswordHasher', () => {
   it('rejects a malformed hash instead of throwing', async () => {
     expect(await hasher.verify('correct-horse-battery', 'not-a-hash')).toBe(false);
   });
+
+  // `!!!` decodes to zero bytes; comparing two empty keys would otherwise match.
+  it('rejects a hash whose key has the wrong length', async () => {
+    expect(await hasher.verify('any-password', 'scrypt:c2FsdA==:!!!')).toBe(false);
+  });
 });

@@ -26,3 +26,6 @@ pnpm-debug.log*
 *.pem
 .vercel
 .idea/
+
+# playwright mcp output
+.playwright-mcp/

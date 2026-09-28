@@ -11,7 +11,9 @@ printf '%s' "$cmd" | grep -Eq '(^|[;&|[:space:]])git([[:space:]]+-C[[:space:]]+[
 printf '%s' "$cmd" | grep -q 'Docs-Checked:' && exit 0
 
 cd "${cwd:-$CLAUDE_PROJECT_DIR}" 2>/dev/null || exit 0
-git rev-parse --git-dir >/dev/null 2>&1 || exit 0
+# The map's patterns are root-relative, and `git ls-files` prints cwd-relative paths.
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+cd "$root" || exit 0
 
 # Everything that may end up in the commit: staged, unstaged and untracked,
 # since `git add ... && git commit` stages only after this hook runs.
@@ -35,7 +37,8 @@ hits=$(printf '%s\n' "$changed" | grep -E \
   -e '\.guard\.ts$' \
   -e '(^|/)(eslint\.config\.[cm]?js|\.prettierrc[^/]*|\.prettierignore|tsconfig[^/]*\.json|vitest\.config[^/]*|nest-cli\.json|next\.config\.[^/]+|prisma[^/]*\.config\.ts)$' \
   -e '^\.claude/(settings\.json|hooks/)' \
-  -e '^skills-lock\.json$')
+  -e '^skills-lock\.json$' \
+  -e '^\.mcp\.json$')
 
 [ -z "$hits" ] && exit 0
 

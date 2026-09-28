@@ -9,19 +9,30 @@ The package is ESM (`"type": "module"`, `module: nodenext`):
 - Relative imports end in `.js`: `import { AppService } from './app.service.js'`.
 - Package subpaths without an `exports` map also need `.js`: `supertest/types.js`.
 
+## Modules
+
+- `config/`: env validation (`validateEnv`, `Env` type).
+- `prisma/`: `PrismaModule` / `PrismaService`, the only database client.
+- `users/`: `UsersService`, data access for the `users` table.
+- `auth/`: register and login (CQRS), `PasswordHasher`, `AccessTokenService`, and `JwtAuthGuard` / `@CurrentUser()` for other modules.
+- `meetings/`: create, list and get the caller's meetings (CQRS); `MeetingsRepository`, data access for the `meetings` table.
+
+Data access lives in one injectable per table; CQRS handlers call it, never `PrismaService` directly. Name new ones `<Feature>Repository` (`UsersService` predates this).
+
 ## Environment
 
 `.env` (gitignored; copy `.env.example`). Validated at startup by `src/config/env.ts`; add new vars there and to `.env.example`.
 
 - `DATABASE_URL`: required. Postgres from the root `docker-compose.yml`.
-- `JWT_SECRET`: required. Signs access tokens.
-- `JWT_EXPIRES_IN`: optional, default `1h`.
+- `JWT_SECRET`: required. Signs access tokens. Must be at least 32 characters when `NODE_ENV=production`.
+- `JWT_EXPIRES_IN`: optional, default `1h`. A number with a unit (`s`, `m`, `h`, `d`); a bare number is rejected because jsonwebtoken would read it as milliseconds.
+- `PORT`: optional, default `3001`. Read directly in `src/main.ts`, not validated.
 
 Read config through `ConfigService<Env, true>`, not `process.env`.
 
 ## Database (Prisma 7)
 
-- Schema: `prisma/schema.prisma`; migrations: `prisma/migrations/`. Tables and columns are snake_case via `@@map` / `@map`.
+- Schema: `prisma/schema.prisma`; migrations: `prisma/migrations/`. Tables and columns are snake_case via `@@map` / `@map`. Every `DateTime` column is `@db.Timestamptz(3)`.
 - CLI config is `prisma7.config.ts`, not the default name, so every Prisma command needs `--config prisma7.config.ts`. The package scripts pass it.
 - The client is generated into `src/generated/prisma/` (gitignored, excluded from lint and Prettier). `postinstall` regenerates it; after a schema change run `pnpm db:generate`. Import from `../generated/prisma/client.js`, never `@prisma/client`.
 - Inject `PrismaService` (from `PrismaModule`) instead of creating clients.
@@ -38,7 +49,13 @@ A global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`) is registered as
 
 ## Auth
 
-`POST /auth/register` and `POST /auth/login` return `{ accessToken }`, a JWT with `sub` (user id) and `email`. Passwords are hashed with scrypt (`src/auth/password-hasher.ts`).
+`POST /auth/register` and `POST /auth/login` return `{ accessToken }`, a JWT with `sub` (user id) and `email`. Passwords are hashed with scrypt (`src/auth/password-hasher.ts`). Emails are lowercased in `UsersService` before every write and lookup, so pass them through it rather than querying `users` directly.
+
+Protect a route with `@UseGuards(JwtAuthGuard)` (import `AuthModule` in the feature module) and read the caller with `@CurrentUser() user: AuthUser` (`{ id, email }`). Routes are public unless guarded.
+
+## Ownership
+
+User-owned rows (e.g. `meetings.owner_id`) are always queried with the owner in the `where`, never fetched by id and checked afterwards. Another user's row, a missing row and a malformed id all answer `404`.
 
 ## CQRS
 
@@ -50,10 +67,10 @@ Use-cases go through `@nestjs/cqrs` (`CqrsModule.forRoot()` in `AppModule`); con
 
 ## Generating code
 
-Use the Nest CLI so modules are wired into `AppModule`:
+Create a feature module with the Nest CLI so it is wired into `AppModule`, then add the controller, commands and queries by hand (see CQRS). Not `nest g resource`: it generates a CRUD service that bypasses CQRS.
 
 ```bash
-pnpm --filter @meeting-brain/api exec nest g resource <name>
+pnpm --filter @meeting-brain/api exec nest g module <name>
 ```
 
 ## Tests

@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller.js';
 import { AccessTokenService } from './access-token.service.js';
 import { RegisterUserHandler } from './commands/register-user/register-user.handler.js';
 import { LoginHandler } from './queries/login/login.handler.js';
+import { JwtAuthGuard } from './jwt-auth.guard.js';
 import { PasswordHasher } from './password-hasher.js';
 
 @Module({
@@ -25,6 +26,8 @@ import { PasswordHasher } from './password-hasher.js';
     }),
   ],
   controllers: [AuthController],
-  providers: [PasswordHasher, AccessTokenService, RegisterUserHandler, LoginHandler],
+  providers: [PasswordHasher, AccessTokenService, JwtAuthGuard, RegisterUserHandler, LoginHandler],
+  // JwtModule is re-exported because JwtAuthGuard needs JwtService wherever it is used.
+  exports: [JwtAuthGuard, JwtModule],
 })
 export class AuthModule {}
