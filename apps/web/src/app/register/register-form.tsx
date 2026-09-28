@@ -13,7 +13,14 @@ import {
   Spinner,
   TextField,
 } from '@heroui/react';
-import { type FormEvent, startTransition, useActionState, useState } from 'react';
+import {
+  type FormEvent,
+  startTransition,
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { register, type RegisterState } from './actions';
 
 const initialState: RegisterState = {};
@@ -21,6 +28,15 @@ const initialState: RegisterState = {};
 export function RegisterForm() {
   const [state, formAction, isPending] = useActionState(register, initialState);
   const [isPasswordVisible, setPasswordVisible] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Native validation focuses the first invalid field on submit; do the same
+  // when the server rejects a field, so screen readers read its error.
+  useEffect(() => {
+    if (state.fieldErrors) {
+      formRef.current?.querySelector<HTMLInputElement>('input[aria-invalid="true"]')?.focus();
+    }
+  }, [state]);
 
   // Submitting via onSubmit rather than `action`: React resets a form after
   // its `action` runs, which would wipe the fields when the API rejects them.
@@ -31,9 +47,14 @@ export function RegisterForm() {
   };
 
   return (
-    <Form className="flex flex-col gap-5" validationErrors={state.fieldErrors} onSubmit={onSubmit}>
+    <Form
+      ref={formRef}
+      className="flex flex-col gap-5"
+      validationErrors={state.fieldErrors}
+      onSubmit={onSubmit}
+    >
       {state.formError ? (
-        <Alert status="danger">
+        <Alert role="alert" status="danger">
           <Alert.Indicator />
           <Alert.Content>
             <Alert.Title>{state.formError}</Alert.Title>
@@ -50,8 +71,16 @@ export function RegisterForm() {
         type="email"
       >
         <Label>Email</Label>
-        <Input placeholder="you@company.com" />
-        <FieldError />
+        <Input className="h-11" placeholder="you@company.com" />
+        <FieldError>
+          {({ validationDetails, validationErrors }) =>
+            validationDetails.valueMissing
+              ? 'Enter your email address.'
+              : validationDetails.typeMismatch
+                ? 'Enter an email address like name@company.com.'
+                : validationErrors.join(' ')
+          }
+        </FieldError>
       </TextField>
 
       <TextField
@@ -64,11 +93,12 @@ export function RegisterForm() {
         type={isPasswordVisible ? 'text' : 'password'}
       >
         <Label>Password</Label>
-        <InputGroup fullWidth>
+        <InputGroup fullWidth className="h-11">
           <InputGroup.Input placeholder="At least 8 characters" />
           <InputGroup.Suffix className="pe-0">
             <Button
               isIconOnly
+              className="size-11"
               aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
               size="sm"
               variant="ghost"
@@ -79,7 +109,15 @@ export function RegisterForm() {
           </InputGroup.Suffix>
         </InputGroup>
         <Description>8 to 128 characters.</Description>
-        <FieldError />
+        <FieldError>
+          {({ validationDetails, validationErrors }) =>
+            validationDetails.valueMissing
+              ? 'Enter a password.'
+              : validationDetails.tooShort
+                ? 'Use at least 8 characters.'
+                : validationErrors.join(' ')
+          }
+        </FieldError>
       </TextField>
 
       <Button fullWidth className="mt-1" isPending={isPending} size="lg" type="submit">

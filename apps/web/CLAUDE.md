@@ -19,7 +19,7 @@ The `@AGENTS.md` import above and the rules block in `AGENTS.md` are managed by 
 ## HeroUI
 
 - v3 (`@heroui/react`, `@heroui/styles`): no provider, compound components (`<Card><Card.Header>`), `onPress` instead of `onClick`. Read the `heroui-react` skill first; v2 examples (`HeroUIProvider`, `@heroui/theme`, `framer-motion`) do not apply.
-- `globals.css` imports `@heroui/styles` right after `tailwindcss`; keep that order. HeroUI owns the color tokens (`--background`, `--foreground`, `--accent`, ...), so use them (`bg-background`, `text-foreground`) instead of redefining colors. The only local theme override is the Geist fonts.
+- `globals.css` imports `@heroui/styles` right after `tailwindcss`; keep that order. HeroUI owns the color tokens (`--background`, `--foreground`, `--accent`, ...), so use them (`bg-background`, `text-foreground`) instead of redefining colors. The local theme overrides are the Geist fonts and a darker light-mode `--muted` and `--danger`: HeroUI's defaults miss WCAG AA 4.5:1 text contrast on `--background`.
 - Dark mode is `class="dark"` or `data-theme="dark"` on `<html>`; nothing sets it yet, so the app renders light.
 - `@internationalized/date` is installed as a HeroUI peer for the date components.
 - Icons come from `@gravity-ui/icons`, the set the HeroUI docs use.

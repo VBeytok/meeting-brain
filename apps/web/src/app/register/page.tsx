@@ -28,9 +28,9 @@ export default function RegisterPage() {
         <Brand className="relative" />
 
         <div className="relative max-w-md">
-          <h2 className="text-4xl leading-tight font-semibold tracking-tight text-balance">
+          <p className="text-4xl leading-tight font-semibold tracking-tight text-balance">
             Every meeting, remembered.
-          </h2>
+          </p>
           <ul className="mt-8 flex flex-col gap-4">
             {highlights.map((text) => (
               <li key={text} className="flex items-start gap-3 text-background/80">
