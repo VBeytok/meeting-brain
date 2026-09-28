@@ -40,6 +40,16 @@ The API talks to it through Prisma; schema and migrations live in `apps/api/pris
 
 `accessToken` is an HS256 JWT with `sub` (user id) and `email`. Passwords need at least 8 characters.
 
+Meeting routes need `Authorization: Bearer <accessToken>` (`401` without a valid one) and only see the caller's own meetings:
+
+| Method | Path            | Body                                      | Success         | Errors                                        |
+| ------ | --------------- | ----------------------------------------- | --------------- | --------------------------------------------- |
+| POST   | `/meetings`     | `{ title, date, participants: string[] }` | `201` meeting   | `400` invalid input                           |
+| GET    | `/meetings`     |                                           | `200` meeting[] |                                               |
+| GET    | `/meetings/:id` |                                           | `200` meeting   | `404` missing, not yours, or id is not a UUID |
+
+A meeting is `{ id, title, date, participants }`; `date` is ISO 8601 and comes back in UTC.
+
 ## Scripts (from the repo root)
 
 ```bash

@@ -8,6 +8,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { UsersModule } from './users/users.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { validateEnv } from './config/env.js';
+import { MeetingsModule } from './meetings/meetings.module.js';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { validateEnv } from './config/env.js';
     PrismaModule,
     UsersModule,
     AuthModule,
+    MeetingsModule,
   ],
   controllers: [AppController],
   providers: [

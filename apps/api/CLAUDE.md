@@ -40,6 +40,12 @@ A global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`) is registered as
 
 `POST /auth/register` and `POST /auth/login` return `{ accessToken }`, a JWT with `sub` (user id) and `email`. Passwords are hashed with scrypt (`src/auth/password-hasher.ts`).
 
+Protect a route with `@UseGuards(JwtAuthGuard)` (import `AuthModule` in the feature module) and read the caller with `@CurrentUser() user: AuthUser` (`{ id, email }`). Routes are public unless guarded.
+
+## Ownership
+
+User-owned rows (e.g. `meetings.owner_id`) are always queried with the owner in the `where`, never fetched by id and checked afterwards. Another user's row, a missing row and a malformed id all answer `404`.
+
 ## CQRS
 
 Use-cases go through `@nestjs/cqrs` (`CqrsModule.forRoot()` in `AppModule`); controllers only build a command or query and hand it to `CommandBus` / `QueryBus`.
