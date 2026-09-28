@@ -2,10 +2,10 @@
 
 pnpm monorepo.
 
-| App                  | Path       | Stack           | Dev URL               |
-| -------------------- | ---------- | --------------- | --------------------- |
-| `@meeting-brain/web` | `apps/web` | Next.js         | http://localhost:3000 |
-| `@meeting-brain/api` | `apps/api` | NestJS + Prisma | http://localhost:3001 |
+| App                  | Path       | Stack            | Dev URL               |
+| -------------------- | ---------- | ---------------- | --------------------- |
+| `@meeting-brain/web` | `apps/web` | Next.js + HeroUI | http://localhost:3000 |
+| `@meeting-brain/api` | `apps/api` | NestJS + Prisma  | http://localhost:3001 |
 
 ## Setup
 
