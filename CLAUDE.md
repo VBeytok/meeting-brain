@@ -19,6 +19,12 @@ If `pnpm` is not on PATH, run `corepack enable pnpm` once (the version is pinned
 
 A change is done when `pnpm lint && pnpm typecheck && pnpm test && pnpm format:check` passes.
 
+A change to `apps/web` UI (pages, components, styles) is also not done until it has been checked visually:
+
+1. Open every affected page on the running dev server through the `playwright` MCP. Walk through each state: empty, filled, validation errors, loading, success. Check desktop and mobile widths.
+2. Review what you see against the `ui-ux-pro-max` skill (its priority table, `references/quick-reference.md`, and the pre-delivery checklist in `references/pro-rules.md`).
+3. Fix what fails and check again. Report what you checked and what you fixed.
+
 ## Keeping docs current
 
 Docs ship in the same commit as the change that makes them stale. Before committing, audit every doc the map names for the files you touched: add what is missing, delete what is no longer true (no appended corrections). Done means every named doc matches the code.
@@ -52,7 +58,7 @@ Work on a branch off `main`; open a PR with `gh pr create --base main`.
   - `## Changes`: bullets grouped by area (endpoints, data model, tooling, docs). Name new env vars, scripts, migrations and dependencies.
   - `## How to test`: exact commands, including setup a reviewer needs (env file, `docker compose up`, migrations).
   - `## Notes`: decisions a reviewer should question, known gaps, breaking changes. Omit if empty.
-- **Before opening:** the done-check passes; if `apps/api` changed, `pnpm --filter @meeting-brain/api test:e2e` passes too.
+- **Before opening:** the done-check passes; if `apps/api` changed, `pnpm --filter @meeting-brain/api test:e2e` passes too; if `apps/web` UI changed, the visual check is done.
 
 ## MCP servers
 
@@ -71,5 +77,6 @@ Read the matching `SKILL.md` before the work it covers:
 - Prisma Client queries in `apps/api`: `prisma-client-api`
 - React / Next.js code in `apps/web`: `vercel-react-best-practices`
 - HeroUI components: `heroui-react`
+- Any `apps/web` UI change, and the visual check before calling it done: `ui-ux-pro-max`
 - Committing: `git-commit`
 - Finishing a feature, before merge: `requesting-code-review`
