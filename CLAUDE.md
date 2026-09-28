@@ -58,7 +58,7 @@ Work on a branch off `main`; open a PR with `gh pr create --base main`.
 
 Project MCP servers live in `.mcp.json` (add with `claude mcp add --scope project <name> -- <command>`); Claude Code asks each user to approve them on first use.
 
-- `playwright` (`npx @playwright/mcp@latest`): drives a real browser. Use it to check `apps/web` pages against the running dev server.
+- `playwright` (`npx @playwright/mcp@0.0.82`): drives a real browser. Use it to check `apps/web` pages against the running dev server.
 
 ## Project skills
 
