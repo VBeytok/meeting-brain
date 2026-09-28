@@ -21,9 +21,20 @@ A change is done when `pnpm lint && pnpm typecheck && pnpm test && pnpm format:c
 
 ## Keeping docs current
 
-Architecture changes ship with their doc updates in the same change. Architecture means: adding, removing or renaming an app or package; changing ports, env vars, scripts, or how apps talk to each other; swapping or reconfiguring tooling (lint, format, test, build); introducing a convention every future change must follow.
+Docs ship in the same commit as the change that makes them stale. Before committing, audit every doc the map names for the files you touched: add what is missing, delete what is no longer true (no appended corrections). Done means every named doc matches the code.
 
-When one of these lands, update every doc it makes stale: this file, the affected `apps/*/CLAUDE.md`, and `README.md`. Remove lines that are no longer true rather than appending corrections. The change is done when every one of those docs matches the code.
+| Files touched                                                   | Docs to audit                                                                |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `package.json` (scripts, deps), `pnpm-workspace.yaml`           | README Setup + Scripts; this file's Commands; `apps/*/CLAUDE.md`             |
+| `.env.example`, `apps/api/src/config/`, `src/main.ts`           | `apps/api/CLAUDE.md` Environment; README Setup                               |
+| `docker-compose.yml`, `apps/api/prisma/**`, `prisma*.config.ts` | README Setup + Database; this file's app list; `apps/api/CLAUDE.md` Database |
+| `*.module.ts` (new or removed feature)                          | `apps/api/CLAUDE.md` Modules                                                 |
+| `*.controller.ts`, `**/dto/**`, `*.guard.ts`                    | README API endpoints; `apps/api/CLAUDE.md` Auth                              |
+| lint, format, test, build or TS config                          | this file's Tooling conventions; the app's `CLAUDE.md`; README Scripts       |
+| `.claude/settings.json`, `.claude/hooks/`, `skills-lock.json`   | this file                                                                    |
+| a new rule every future change must follow                      | this file or the app's `CLAUDE.md`, wherever it applies                      |
+
+The `.claude/hooks/docs-check.sh` hook enforces this: a `git commit` touching mapped files is blocked until the message has a `Docs-Checked:` trailer naming the docs audited (or `Docs-Checked: none needed, <why>`).
 
 ## Tooling conventions
 
