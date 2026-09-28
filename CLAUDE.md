@@ -38,6 +38,8 @@ Skills live in `.claude/skills/`, installed with the `skills` CLI and tracked in
 Read the matching `SKILL.md` before the work it covers:
 
 - NestJS code in `apps/api`: `nestjs-best-practices`
+- Prisma schema, migrations or CLI in `apps/api`: `prisma-cli` (run commands through the `db:*` package scripts, which pass `--config prisma7.config.ts`)
+- Prisma Client queries in `apps/api`: `prisma-client-api`
 - React / Next.js code in `apps/web`: `vercel-react-best-practices`
 - HeroUI components: `heroui-react`
 - Committing: `git-commit`
