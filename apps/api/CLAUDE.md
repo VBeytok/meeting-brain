@@ -25,7 +25,7 @@ Data access lives in one injectable per table; CQRS handlers call it, never `Pri
 
 - `DATABASE_URL`: required. Postgres from the root `docker-compose.yml`.
 - `JWT_SECRET`: required. Signs access tokens.
-- `JWT_EXPIRES_IN`: optional, default `1h`.
+- `JWT_EXPIRES_IN`: optional, default `1h`. A number with a unit (`s`, `m`, `h`, `d`); a bare number is rejected because jsonwebtoken would read it as milliseconds.
 - `PORT`: optional, default `3001`. Read directly in `src/main.ts`, not validated.
 
 Read config through `ConfigService<Env, true>`, not `process.env`.
@@ -49,7 +49,7 @@ A global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`) is registered as
 
 ## Auth
 
-`POST /auth/register` and `POST /auth/login` return `{ accessToken }`, a JWT with `sub` (user id) and `email`. Passwords are hashed with scrypt (`src/auth/password-hasher.ts`).
+`POST /auth/register` and `POST /auth/login` return `{ accessToken }`, a JWT with `sub` (user id) and `email`. Passwords are hashed with scrypt (`src/auth/password-hasher.ts`). Emails are lowercased in `UsersService` before every write and lookup, so pass them through it rather than querying `users` directly.
 
 Protect a route with `@UseGuards(JwtAuthGuard)` (import `AuthModule` in the feature module) and read the caller with `@CurrentUser() user: AuthUser` (`{ id, email }`). Routes are public unless guarded.
 

@@ -88,11 +88,26 @@ describe('Meetings (e2e)', () => {
       expect((res.body as Meeting).participants).toEqual([]);
     });
 
+    it('stores a date with an offset as the same instant in UTC', async () => {
+      const token = await signUp();
+
+      const res = await createMeeting(token, {
+        ...NEW_MEETING,
+        date: '2026-10-01T12:00:00+02:00',
+      }).expect(201);
+
+      expect((res.body as Meeting).date).toBe('2026-10-01T10:00:00.000Z');
+    });
+
     it.each([
       ['missing title', { date: NEW_MEETING.date, participants: NEW_MEETING.participants }],
       ['empty title', { ...NEW_MEETING, title: '' }],
       ['missing date', { title: NEW_MEETING.title, participants: NEW_MEETING.participants }],
       ['invalid date', { ...NEW_MEETING, date: 'next tuesday' }],
+      ['a week date', { ...NEW_MEETING, date: '2026-W40-4' }],
+      ['an ordinal date', { ...NEW_MEETING, date: '2026-274' }],
+      ['a date without a time', { ...NEW_MEETING, date: '2026-10-01' }],
+      ['a date-time without an offset', { ...NEW_MEETING, date: '2026-10-01T10:00:00' }],
       ['missing participants', { title: NEW_MEETING.title, date: NEW_MEETING.date }],
       ['participants that is not an array', { ...NEW_MEETING, participants: 'alice' }],
       ['a participant that is not a string', { ...NEW_MEETING, participants: ['alice', 42] }],

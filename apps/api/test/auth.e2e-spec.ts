@@ -67,6 +67,13 @@ describe('Auth (e2e)', () => {
       await register({ email, password: 'another-password' }).expect(409);
     });
 
+    it('rejects an email that differs from a registered one only in case', async () => {
+      const email = uniqueEmail();
+      await register({ email, password: PASSWORD }).expect(201);
+
+      await register({ email: email.toUpperCase(), password: PASSWORD }).expect(409);
+    });
+
     it('never returns the password', async () => {
       const res = await register({ email: uniqueEmail(), password: PASSWORD }).expect(201);
 
@@ -96,6 +103,15 @@ describe('Auth (e2e)', () => {
       expect(payload.sub).toBe(registeredUserId);
       expect(payload.email).toBe(email);
       expect(payload.exp).toBeGreaterThan(Math.floor(Date.now() / 1000));
+    });
+
+    it('matches the email regardless of case', async () => {
+      const email = uniqueEmail();
+      await register({ email: email.toUpperCase(), password: PASSWORD }).expect(201);
+
+      const res = await login({ email, password: PASSWORD }).expect(200);
+
+      expect(decodeJwt(accessTokenOf(res)).email).toBe(email);
     });
 
     it('rejects a wrong password', async () => {
