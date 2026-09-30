@@ -8,7 +8,7 @@ const UNIQUE_VIOLATION = 'P2002';
 const normalizeEmail = (email: string): string => email.toLowerCase();
 
 @Injectable()
-export class UsersService {
+export class UsersRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   findByEmail(email: string): Promise<User | null> {
