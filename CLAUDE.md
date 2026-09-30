@@ -46,6 +46,7 @@ The `.claude/hooks/docs-check.sh` hook enforces this: a `git commit` touching ma
 
 - **Prettier** is configured once, at the root (`.prettierrc.json`, `.prettierignore`). Apps carry no Prettier config or dependency. A Claude Code hook (`.claude/hooks/format.sh`) formats every file after Write/Edit; files changed through Bash still need `pnpm format`.
 - **ESLint** is per app (`apps/*/eslint.config.mjs`), each ending with `eslint-config-prettier`. Stays on ESLint 9: `eslint-config-next` pulls `eslint-plugin-react`, which does not support ESLint 10 yet.
+- **Husky** runs `.husky/pre-commit` (`pnpm lint && pnpm test`) on every `git commit`; the root `prepare` script installs it on `pnpm install`. Fix failures instead of bypassing with `--no-verify`.
 - Packages with install scripts must be approved in `pnpm-workspace.yaml` under `allowBuilds`.
 
 ## Pull requests

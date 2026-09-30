@@ -12,7 +12,7 @@ pnpm monorepo.
 Requires Node 24+ and pnpm (`corepack enable pnpm` puts the pinned version on PATH).
 
 ```bash
-pnpm install                          # also generates the Prisma client
+pnpm install                          # also generates the Prisma client and installs the Husky git hooks
 cp apps/api/.env.example apps/api/.env
 docker compose up -d --wait
 pnpm --filter @meeting-brain/api db:deploy   # apply migrations
@@ -84,3 +84,5 @@ pnpm --filter @meeting-brain/api db:generate   # regenerate the Prisma client
 ```
 
 Prettier is configured once at the root (`.prettierrc.json`); each app has its own `eslint.config.mjs`.
+
+A Husky pre-commit hook (`.husky/pre-commit`) runs `pnpm lint` and `pnpm test`; a failure aborts the commit.
