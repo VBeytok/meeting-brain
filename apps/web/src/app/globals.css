@@ -16,3 +16,12 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
+
+/* HeroUI's skeleton shimmer ignores reduced motion; the static placeholder
+   still shows that content is loading. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::before,
+  .skeleton::after {
+    animation: none;
+  }
+}

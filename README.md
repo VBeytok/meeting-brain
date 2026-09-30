@@ -22,9 +22,11 @@ The web app reaches the API at `http://localhost:3001`; set `API_URL` (e.g. in `
 
 ## Web pages
 
-| Path        | What it does                                                                                   |
-| ----------- | ---------------------------------------------------------------------------------------------- |
-| `/register` | Sign-up form; calls `POST /auth/register`, stores the token in an httpOnly cookie, goes to `/` |
+| Path        | What it does                                                                                                                                                         |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`         | Home, signed-in only (otherwise redirects to `/login`): the user's email, a Log out button, meeting counts (total, upcoming, held, people) and the 3 latest meetings |
+| `/login`    | Sign-in form; calls `POST /auth/login`, stores the token in an httpOnly cookie, goes to `/`; links to `/register`                                                    |
+| `/register` | Sign-up form; calls `POST /auth/register`, stores the token in an httpOnly cookie, goes to `/`; links to `/login`                                                    |
 
 ## Database
 
