@@ -54,12 +54,16 @@ describe('AuthService', () => {
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
-  it('rejects an unknown email', async () => {
+  // Verifying against the dummy hash keeps an unknown email as slow as a wrong password.
+  it('rejects an unknown email after still verifying a password', async () => {
     execute.mockResolvedValue(null);
+    const verify = vi.spyOn(passwords, 'verify');
 
     await expect(
       auth.validateCredentials('nobody@example.com', 'correct-horse-battery'),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(verify).toHaveBeenCalledOnce();
+    verify.mockRestore();
   });
 
   it('hashes passwords so they verify but are not stored in plain text', async () => {

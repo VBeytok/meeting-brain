@@ -12,6 +12,7 @@ import { PasswordHasher } from './password-hasher.js';
 
 @Module({
   imports: [
+    // Registers the CreateUserCommand / FindUserByEmailQuery handlers auth dispatches to.
     UsersModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
