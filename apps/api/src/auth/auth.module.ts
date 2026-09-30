@@ -4,7 +4,7 @@ import { JwtModule, type JwtModuleOptions } from '@nestjs/jwt';
 import { UsersModule } from '../users/users.module.js';
 import type { Env } from '../config/env.js';
 import { AuthController } from './auth.controller.js';
-import { AccessTokenService } from './access-token.service.js';
+import { AuthService } from './auth.service.js';
 import { RegisterUserHandler } from './commands/register-user/register-user.handler.js';
 import { LoginHandler } from './queries/login/login.handler.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
@@ -26,8 +26,8 @@ import { PasswordHasher } from './password-hasher.js';
     }),
   ],
   controllers: [AuthController],
-  providers: [PasswordHasher, AccessTokenService, JwtAuthGuard, RegisterUserHandler, LoginHandler],
-  // JwtModule is re-exported because JwtAuthGuard needs JwtService wherever it is used.
-  exports: [JwtAuthGuard, JwtModule],
+  providers: [PasswordHasher, AuthService, JwtAuthGuard, RegisterUserHandler, LoginHandler],
+  // AuthService is exported because JwtAuthGuard needs it wherever it is used.
+  exports: [JwtAuthGuard, AuthService],
 })
 export class AuthModule {}

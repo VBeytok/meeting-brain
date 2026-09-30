@@ -13,11 +13,11 @@ The package is ESM (`"type": "module"`, `module: nodenext`):
 
 - `config/`: env validation (`validateEnv`, `Env` type).
 - `prisma/`: `PrismaModule` / `PrismaService`, the only database client.
-- `users/`: `UsersService`, data access for the `users` table.
-- `auth/`: register and login (CQRS), `PasswordHasher`, `AccessTokenService`, and `JwtAuthGuard` / `@CurrentUser()` for other modules.
+- `users/`: user records (CQRS): `CreateUserCommand`, `FindUserByEmailQuery`; `UsersRepository`, data access for the `users` table. Exports no providers: other modules go through the buses.
+- `auth/`: register and login (CQRS); `AuthService` (password hashing, credential checks, issuing and verifying access tokens) on top of `PasswordHasher`; `JwtAuthGuard` / `@CurrentUser()` for other modules.
 - `meetings/`: create, list and get the caller's meetings (CQRS); `MeetingsRepository`, data access for the `meetings` table.
 
-Data access lives in one injectable per table; CQRS handlers call it, never `PrismaService` directly. Name new ones `<Feature>Repository` (`UsersService` predates this).
+Data access lives in one injectable per table; CQRS handlers call it, never `PrismaService` directly. Name new ones `<Feature>Repository`.
 
 ## Environment
 
@@ -49,7 +49,7 @@ A global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`) is registered as
 
 ## Auth
 
-`POST /auth/register` and `POST /auth/login` return `{ accessToken }`, a JWT with `sub` (user id) and `email`. Passwords are hashed with scrypt (`src/auth/password-hasher.ts`). Emails are lowercased in `UsersService` before every write and lookup, so pass them through it rather than querying `users` directly.
+`POST /auth/register` and `POST /auth/login` return `{ accessToken }`, a JWT with `sub` (user id) and `email`. Passwords are hashed with scrypt (`src/auth/password-hasher.ts`). Auth never touches the `users` table: `AuthService` and the register handler send `FindUserByEmailQuery` / `CreateUserCommand`, and `UsersRepository` lowercases emails before every write and lookup.
 
 Protect a route with `@UseGuards(JwtAuthGuard)` (import `AuthModule` in the feature module) and read the caller with `@CurrentUser() user: AuthUser` (`{ id, email }`). Routes are public unless guarded.
 

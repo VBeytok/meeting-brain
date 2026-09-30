@@ -1,20 +1,19 @@
-import { CommandHandler, type ICommandHandler } from '@nestjs/cqrs';
-import { UsersService } from '../../../users/users.service.js';
-import { AccessTokenService } from '../../access-token.service.js';
+import { CommandBus, CommandHandler, type ICommandHandler } from '@nestjs/cqrs';
+import { CreateUserCommand } from '../../../users/commands/create-user/create-user.command.js';
+import { AuthService } from '../../auth.service.js';
 import type { AuthResponseDto } from '../../dto/auth-response.dto.js';
-import { PasswordHasher } from '../../password-hasher.js';
 import { RegisterUserCommand } from './register-user.command.js';
 
 @CommandHandler(RegisterUserCommand)
 export class RegisterUserHandler implements ICommandHandler<RegisterUserCommand> {
   constructor(
-    private readonly users: UsersService,
-    private readonly passwords: PasswordHasher,
-    private readonly tokens: AccessTokenService,
+    private readonly commandBus: CommandBus,
+    private readonly auth: AuthService,
   ) {}
 
   async execute({ email, password }: RegisterUserCommand): Promise<AuthResponseDto> {
-    const user = await this.users.create(email, await this.passwords.hash(password));
-    return this.tokens.issue(user);
+    const passwordHash = await this.auth.hashPassword(password);
+    const user = await this.commandBus.execute(new CreateUserCommand(email, passwordHash));
+    return this.auth.issueToken(user);
   }
 }
