@@ -1,6 +1,7 @@
-import { Calendar, CircleCheck, Clock, Persons } from '@gravity-ui/icons';
+import { Calendar, CircleCheck, Clock, Persons, Plus } from '@gravity-ui/icons';
 import { Alert, Card, Chip, Skeleton } from '@heroui/react';
 import type { ComponentType, SVGProps } from 'react';
+import { ButtonLink } from '@/components/button-link';
 import { getMeetings, type Meeting } from '@/lib/meetings';
 import type { Session } from '@/lib/session';
 
@@ -17,7 +18,8 @@ const dateTimeFormat = new Intl.DateTimeFormat('en', {
   minute: '2-digit',
 });
 
-export async function Dashboard({ session }: { session: Session }) {
+// `createdId` names a meeting that was just created; the dashboard confirms it.
+export async function Dashboard({ session, createdId }: { session: Session; createdId?: string }) {
   const meetings = await getMeetings(session);
 
   if (meetings === null) {
@@ -33,9 +35,12 @@ export async function Dashboard({ session }: { session: Session }) {
   }
 
   const { stats, latest } = summarize(meetings);
+  const created = createdId ? meetings.find((m) => m.id === createdId) : undefined;
 
   return (
     <>
+      {created ? <CreatedAlert meeting={created} /> : null}
+
       <section aria-labelledby="kpi-heading" className="mt-8">
         <h2 id="kpi-heading" className="sr-only">
           Summary
@@ -167,7 +172,28 @@ function EmptyState() {
           Your meetings will show up here, with the latest {LATEST_COUNT} at the top.
         </Card.Description>
       </Card.Header>
+      <ButtonLink className="h-11" href="/meetings/new" variant="secondary">
+        <Plus aria-hidden />
+        Add your first meeting
+      </ButtonLink>
     </Card>
+  );
+}
+
+// The new meeting may be older than the latest few, so the confirmation names it.
+function CreatedAlert({ meeting }: { meeting: Meeting }) {
+  return (
+    <Alert className="mt-8" role="status" status="success">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>Meeting added</Alert.Title>
+        <Alert.Description>
+          <span className="break-words">{meeting.title}</span>
+          {' · '}
+          <time dateTime={meeting.date}>{dateTimeFormat.format(new Date(meeting.date))}</time>
+        </Alert.Description>
+      </Alert.Content>
+    </Alert>
   );
 }
 
