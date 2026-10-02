@@ -16,5 +16,41 @@ services:
       timeout: 5s
       retries: 10
 
+  # S3-compatible object storage for meeting files. MinIO's own images left
+  # Docker Hub and quay.io; Chainguard builds it from source (only `latest` is
+  # free to pull).
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    restart: unless-stopped
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-meeting_brain}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-meeting_brain_secret}
+      # The browser PUTs uploads straight to MinIO through presigned URLs.
+      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_CORS_ALLOW_ORIGIN:-http://localhost:3000}
+    ports:
+      - '${MINIO_PORT:-9000}:9000'
+      - '${MINIO_CONSOLE_PORT:-9001}:9001'
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'minio', '--version']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Creates the bucket once MinIO is up, then exits. The image has no shell,
+  # so the server alias comes from MC_HOST_<alias>.
+  minio-init:
+    image: cgr.dev/chainguard/minio-client:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MC_HOST_local: http://${MINIO_ROOT_USER:-meeting_brain}:${MINIO_ROOT_PASSWORD:-meeting_brain_secret}@minio:9000
+    command: ['mb', '--ignore-existing', 'local/${MINIO_BUCKET:-meeting-brain}']
+    restart: 'no'
+
 volumes:
   postgres-data:
+  minio-data:

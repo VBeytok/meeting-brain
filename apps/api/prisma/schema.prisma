@@ -21,15 +21,52 @@ model User {
 }
 
 model Meeting {
-  id           String   @id @default(uuid(7)) @db.Uuid
+  id           String        @id @default(uuid(7)) @db.Uuid
   title        String
-  date         DateTime @db.Timestamptz(3)
+  date         DateTime      @db.Timestamptz(3)
   participants String[]
-  ownerId      String   @map("owner_id") @db.Uuid
-  owner        User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  ownerId      String        @map("owner_id") @db.Uuid
+  owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  files        MeetingFile[]
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([ownerId])
   @@map("meetings")
+}
+
+enum MeetingFileKind {
+  RECORDING
+  TRANSCRIPT
+
+  @@map("meeting_file_kind")
+}
+
+enum MeetingFileStatus {
+  // Created with a presigned upload URL; the bytes may not be in storage yet.
+  PENDING_UPLOAD
+  // The upload is confirmed and waits for processing.
+  QUEUED
+
+  @@map("meeting_file_status")
+}
+
+model MeetingFile {
+  id           String            @id @default(uuid(7)) @db.Uuid
+  meetingId    String            @map("meeting_id") @db.Uuid
+  meeting      Meeting           @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  // meetings/{meetingId}/{id}: one prefix per meeting, so deleting a meeting
+  // can clear its objects in one go.
+  storageKey   String            @unique @map("storage_key")
+  originalName String            @map("original_name")
+  mimeType     String            @map("mime_type")
+  // Bytes. Uploads are capped at 1 GB, well inside a 32-bit int.
+  size         Int
+  kind         MeetingFileKind
+  status       MeetingFileStatus @default(PENDING_UPLOAD)
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([meetingId])
+  @@map("meeting_files")
 }

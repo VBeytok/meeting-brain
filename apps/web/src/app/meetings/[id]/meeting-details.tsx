@@ -6,6 +6,7 @@ import { MeetingDateBadge, MeetingStatusChip, participantCount } from '@/compone
 import { RetryButton } from '@/components/retry-button';
 import { dateTimeFormat, isUpcoming } from '@/lib/dates';
 import { getMeeting } from '@/lib/meetings';
+import { FilesPanel } from './files-panel';
 import type { Session } from '@/lib/session';
 
 export async function MeetingDetails({ session, id }: { session: Session; id: string }) {
@@ -61,9 +62,7 @@ export async function MeetingDetails({ session, id }: { session: Session; id: st
             icon={FileText}
             title="Files"
           >
-            <Placeholder>
-              No files yet. Attaching recordings and transcripts is coming next.
-            </Placeholder>
+            <FilesPanel files={meeting.files ?? []} meetingId={meeting.id} />
           </Section>
         </div>
 

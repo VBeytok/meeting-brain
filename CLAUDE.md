@@ -5,6 +5,7 @@ pnpm monorepo with two apps; each has its own `CLAUDE.md` with app-specific rule
 - `apps/web`: `@meeting-brain/web`, Next.js, port 3000
 - `apps/api`: `@meeting-brain/api`, NestJS + Prisma, port 3001. Env in `apps/api/.env` (copy `.env.example`).
 - Postgres 18: `docker-compose.yml` at the root, host port 5432. Start with `docker compose up -d --wait`. Connection: `postgresql://meeting_brain:meeting_brain@localhost:5432/meeting_brain`; env overrides `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`.
+- MinIO (S3-compatible storage for meeting files): same `docker-compose.yml`, API on host port 9000, console on 9001; the `minio-init` service creates the `meeting-brain` bucket. Credentials `meeting_brain` / `meeting_brain_secret` (`MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`); browser CORS origin `MINIO_CORS_ALLOW_ORIGIN` (default `http://localhost:3000`). The image is `cgr.dev/chainguard/minio`: MinIO's own images are gone from Docker Hub and quay.io.
 
 ## Commands
 
