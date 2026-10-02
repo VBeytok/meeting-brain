@@ -22,12 +22,13 @@ The web app reaches the API at `http://localhost:3001`; set `API_URL` (e.g. in `
 
 ## Web pages
 
-| Path            | What it does                                                                                                                                                                                                                           |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`             | Home, signed-in only (otherwise redirects to `/login`): the user's email, a Log out button, a New meeting button, meeting counts (total, upcoming, held, people) and the 3 latest meetings; after a create it confirms the new meeting |
-| `/meetings/new` | New-meeting form, signed-in only: title, date and time (in the browser's timezone), participant emails; calls `POST /meetings`, goes to `/?created=<id>`, where the new meeting is confirmed                                           |
-| `/login`        | Sign-in form; calls `POST /auth/login`, stores the token in an httpOnly cookie, goes to `/`; links to `/register`                                                                                                                      |
-| `/register`     | Sign-up form; calls `POST /auth/register`, stores the token in an httpOnly cookie, goes to `/`; links to `/login`                                                                                                                      |
+| Path             | What it does                                                                                                                                                                                                                                                          |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`              | Home, signed-in only (otherwise redirects to `/login`): the user's email, a Log out button, a New meeting button, meeting counts (total, upcoming, held, people) and the 3 latest meetings, each linking to its page; after a create it confirms the new meeting      |
+| `/meetings/new`  | New-meeting form, signed-in only: title, date and time (in the browser's timezone), participant emails; calls `POST /meetings`, goes to `/?created=<id>`, where the new meeting is confirmed                                                                          |
+| `/meetings/[id]` | One meeting, signed-in only: title, date and time, upcoming or held, participants, and placeholders for the summary and files; calls `GET /meetings/:id`. A missing, malformed or someone else's id shows "Meeting not found"; a failed load shows a Try again button |
+| `/login`         | Sign-in form; calls `POST /auth/login`, stores the token in an httpOnly cookie, goes to `/`; links to `/register`                                                                                                                                                     |
+| `/register`      | Sign-up form; calls `POST /auth/register`, stores the token in an httpOnly cookie, goes to `/`; links to `/login`                                                                                                                                                     |
 
 ## Database
 

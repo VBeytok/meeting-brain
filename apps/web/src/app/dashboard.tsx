@@ -1,22 +1,15 @@
-import { Calendar, CircleCheck, Clock, Persons, Plus } from '@gravity-ui/icons';
-import { Alert, Card, Chip, Skeleton } from '@heroui/react';
+import { Calendar, ChevronRight, CircleCheck, Clock, Persons, Plus } from '@gravity-ui/icons';
+import { Alert, Card, Skeleton } from '@heroui/react';
+import NextLink from 'next/link';
 import type { ComponentType, SVGProps } from 'react';
 import { ButtonLink } from '@/components/button-link';
+import { TextLink } from '@/components/text-link';
+import { MeetingDateBadge, MeetingStatusChip, participantCount } from '@/components/meeting-parts';
+import { dateTimeFormat, isUpcoming } from '@/lib/dates';
 import { getMeetings, type Meeting } from '@/lib/meetings';
 import type { Session } from '@/lib/session';
 
 const LATEST_COUNT = 3;
-
-const dayFormat = new Intl.DateTimeFormat('en', { day: 'numeric' });
-const monthFormat = new Intl.DateTimeFormat('en', { month: 'short' });
-const dateTimeFormat = new Intl.DateTimeFormat('en', {
-  weekday: 'short',
-  year: 'numeric',
-  month: 'short',
-  day: 'numeric',
-  hour: 'numeric',
-  minute: '2-digit',
-});
 
 // `createdId` names a meeting that was just created; the dashboard confirms it.
 export async function Dashboard({ session, createdId }: { session: Session; createdId?: string }) {
@@ -60,9 +53,9 @@ export async function Dashboard({ session, createdId }: { session: Session; crea
         <p className="mt-1 text-sm text-muted">The {LATEST_COUNT} most recent, by meeting date.</p>
         {latest.length > 0 ? (
           <ul className="mt-4 flex flex-col gap-3">
-            {latest.map(({ meeting, isUpcoming }) => (
+            {latest.map(({ meeting, upcoming }) => (
               <li key={meeting.id}>
-                <MeetingRow isUpcoming={isUpcoming} meeting={meeting} />
+                <MeetingRow meeting={meeting} upcoming={upcoming} />
               </li>
             ))}
           </ul>
@@ -77,8 +70,7 @@ export async function Dashboard({ session, createdId }: { session: Session; crea
 // Reads the clock once, so the tiles and the rows agree on what is upcoming.
 function summarize(meetings: Meeting[]) {
   const now = Date.now();
-  const isUpcoming = (m: Meeting) => Date.parse(m.date) > now;
-  const upcoming = meetings.filter(isUpcoming).length;
+  const upcoming = meetings.filter((m) => isUpcoming(m.date, now)).length;
   const people = new Set(
     meetings.flatMap((m) => m.participants.map((p) => p.trim().toLowerCase())),
   );
@@ -93,7 +85,7 @@ function summarize(meetings: Meeting[]) {
     latest: meetings
       .slice(-LATEST_COUNT)
       .reverse()
-      .map((meeting) => ({ meeting, isUpcoming: isUpcoming(meeting) })),
+      .map((meeting) => ({ meeting, upcoming: isUpcoming(meeting.date, now) })),
   };
 }
 
@@ -117,46 +109,37 @@ function Kpi({
   );
 }
 
-function MeetingRow({ meeting, isUpcoming }: { meeting: Meeting; isUpcoming: boolean }) {
-  const date = new Date(meeting.date);
-  const count = meeting.participants.length;
-
+// The whole card links to the meeting page.
+function MeetingRow({ meeting, upcoming }: { meeting: Meeting; upcoming: boolean }) {
   return (
-    <Card className="flex-row items-start gap-4 sm:items-center">
-      <div
-        aria-hidden
-        className="grid size-14 shrink-0 place-content-center rounded-xl bg-accent-soft text-center text-accent-soft-foreground"
-      >
-        <span className="text-xs font-medium uppercase">{monthFormat.format(date)}</span>
-        <span className="text-xl leading-none font-semibold tabular-nums">
-          {dayFormat.format(date)}
-        </span>
-      </div>
-      {/* The chip sits under the details on narrow screens, so the title keeps the width. */}
-      <div className="flex min-w-0 flex-1 flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
-        <div className="min-w-0 flex-1">
-          <Card.Title className="line-clamp-2 break-words">{meeting.title}</Card.Title>
-          <Card.Description className="mt-0.5">
-            <time dateTime={meeting.date}>{dateTimeFormat.format(date)}</time>
-            {' · '}
-            {count === 0 ? 'No participants' : `${count} ${count === 1 ? 'person' : 'people'}`}
-          </Card.Description>
-          {count > 0 ? (
-            <p className="mt-1 line-clamp-2 text-sm text-muted">
-              {meeting.participants.join(', ')}
-            </p>
-          ) : null}
+    <NextLink
+      className="group block rounded-3xl focus-visible:focus-ring"
+      href={`/meetings/${encodeURIComponent(meeting.id)}`}
+    >
+      <Card className="flex-row items-start gap-4 transition-colors group-hover:bg-surface-secondary sm:items-center">
+        <MeetingDateBadge date={meeting.date} />
+        {/* The chip sits under the details on narrow screens, so the title keeps the width. */}
+        <div className="flex min-w-0 flex-1 flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
+          <div className="min-w-0 flex-1">
+            <Card.Title className="line-clamp-2 break-words group-hover:underline">
+              {meeting.title}
+            </Card.Title>
+            <Card.Description className="mt-0.5">
+              <time dateTime={meeting.date}>{dateTimeFormat.format(new Date(meeting.date))}</time>
+              {' · '}
+              {participantCount(meeting.participants.length)}
+            </Card.Description>
+            {meeting.participants.length > 0 ? (
+              <p className="mt-1 line-clamp-2 text-sm text-muted">
+                {meeting.participants.join(', ')}
+              </p>
+            ) : null}
+          </div>
+          <MeetingStatusChip className="shrink-0" upcoming={upcoming} />
         </div>
-        <Chip
-          className="shrink-0"
-          color={isUpcoming ? 'accent' : 'default'}
-          size="sm"
-          variant="soft"
-        >
-          {isUpcoming ? 'Upcoming' : 'Held'}
-        </Chip>
-      </div>
-    </Card>
+        <ChevronRight aria-hidden className="size-4 shrink-0 self-center text-muted" />
+      </Card>
+    </NextLink>
   );
 }
 
@@ -191,6 +174,8 @@ function CreatedAlert({ meeting }: { meeting: Meeting }) {
           <span className="break-words">{meeting.title}</span>
           {' · '}
           <time dateTime={meeting.date}>{dateTimeFormat.format(new Date(meeting.date))}</time>
+          {' · '}
+          <TextLink href={`/meetings/${encodeURIComponent(meeting.id)}`}>Open meeting</TextLink>
         </Alert.Description>
       </Alert.Content>
     </Alert>
