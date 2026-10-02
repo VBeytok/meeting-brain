@@ -1,4 +1,6 @@
 import {
+  DeleteObjectCommand,
+  GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -8,6 +10,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable, type OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { StorageEnv } from '../config/storage-env.js';
+import { attachmentDisposition } from './content-disposition.js';
 import { FileStorage, type StoredObject } from './file-storage.js';
 
 @Injectable()
@@ -52,6 +55,26 @@ export class S3FileStorage extends FileStorage implements OnModuleDestroy {
       expiresIn: expiresInSeconds,
       signableHeaders: new Set(['content-type']),
     });
+  }
+
+  presignDownload(
+    key: string,
+    options: { contentType: string; expiresInSeconds: number; downloadAs?: string },
+  ): Promise<string> {
+    // Storage sends these response headers as given in the signed URL.
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      ResponseContentType: options.contentType,
+      ResponseContentDisposition:
+        options.downloadAs === undefined ? undefined : attachmentDisposition(options.downloadAs),
+    });
+    return getSignedUrl(this.publicClient, command, { expiresIn: options.expiresInSeconds });
+  }
+
+  async delete(key: string): Promise<void> {
+    // S3 answers 204 for a missing key too.
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
   }
 
   async head(key: string): Promise<StoredObject | null> {

@@ -26,9 +26,18 @@ export interface MeetingFile {
   createdAt: string;
 }
 
+// Mirrors the API's MeetingFileWithUrlsDto: a confirmed file as the meeting
+// page lists it. Both URLs are presigned and expire 15 minutes after the fetch.
+export interface ListedMeetingFile extends MeetingFile {
+  // Streams the file with its own type, for <audio> / <video>.
+  playbackUrl: string;
+  // The same bytes as an attachment, saved under the original name.
+  downloadUrl: string;
+}
+
 // Mirrors the API's MeetingDetailsDto: one meeting with its confirmed files.
 export interface MeetingDetails extends Meeting {
-  files: MeetingFile[];
+  files: ListedMeetingFile[];
 }
 
 // The caller's meetings, earliest first, or null when the API cannot be
