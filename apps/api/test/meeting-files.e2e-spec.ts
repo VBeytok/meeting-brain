@@ -17,6 +17,8 @@ type MeetingFile = {
   status: string;
   createdAt: string;
 };
+// A confirmed file as GET /meetings/:id lists it.
+type ListedFile = MeetingFile & { playbackUrl: string; downloadUrl: string };
 type CreatedUpload = {
   file: MeetingFile;
   uploadUrl: string;
@@ -120,6 +122,11 @@ describe('Meeting files (e2e)', () => {
         (id: string) =>
           request(app.getHttpServer()).post(`/meetings/${id}/files/${randomUUID()}/complete`),
       ],
+      [
+        'DELETE /meetings/:id/files/:fileId',
+        (id: string) =>
+          request(app.getHttpServer()).delete(`/meetings/${id}/files/${randomUUID()}`),
+      ],
     ])('%s rejects a request without a token', async (_route, send) => {
       await send(randomUUID()).expect(401);
     });
@@ -153,9 +160,9 @@ describe('Meeting files (e2e)', () => {
       expect(res.body).toEqual({ ...upload.file, status: 'QUEUED' });
 
       const meeting = await getMeeting(token, meetingId).expect(200);
-      expect((meeting.body as { files: MeetingFile[] }).files).toEqual([
-        { ...upload.file, status: 'QUEUED' },
-      ]);
+      const listed = (meeting.body as { files: ListedFile[] }).files;
+      expect(listed).toHaveLength(1);
+      expect(listed[0]).toMatchObject({ ...upload.file, status: 'QUEUED' });
     });
 
     it('answers complete again with the queued file', async () => {
@@ -209,6 +216,128 @@ describe('Meeting files (e2e)', () => {
       const meetingId = await createMeeting(token);
       const upload = await createdUpload(token, meetingId);
       expect((await put(upload, AUDIO, { 'Content-Type': 'video/mp4' })).status).toBe(403);
+    });
+  });
+
+  // Uploads AUDIO under `name` and confirms it; returns the file as listed.
+  async function queuedFile(
+    token: string,
+    meetingId: string,
+    name = 'standup.mp3',
+  ): Promise<ListedFile> {
+    const upload = await createdUpload(token, meetingId, {
+      name,
+      mimeType: 'audio/mpeg',
+      size: AUDIO.length,
+    });
+    await put(upload, AUDIO);
+    await complete(token, meetingId, upload.file.id).expect(200);
+    const meeting = await getMeeting(token, meetingId).expect(200);
+    return (meeting.body as { files: ListedFile[] }).files.find((f) => f.id === upload.file.id)!;
+  }
+
+  const deleteFile = (token: string, meetingId: string, fileId: string) =>
+    request(app.getHttpServer())
+      .delete(`/meetings/${meetingId}/files/${fileId}`)
+      .auth(token, { type: 'bearer' });
+
+  describe('playback and download', () => {
+    it('lists each file with URLs that serve its bytes and expire in 15 minutes', async () => {
+      const token = await signUp();
+      const meetingId = await createMeeting(token);
+      const file = await queuedFile(token, meetingId);
+
+      for (const url of [file.playbackUrl, file.downloadUrl]) {
+        expect(new URL(url).searchParams.get('X-Amz-Expires')).toBe('900');
+      }
+
+      const playback = await fetch(file.playbackUrl);
+      expect(playback.status).toBe(200);
+      expect(playback.headers.get('content-type')).toBe('audio/mpeg');
+      expect(playback.headers.get('content-disposition')).toBeNull();
+      expect(Buffer.from(await playback.arrayBuffer())).toEqual(AUDIO);
+
+      const download = await fetch(file.downloadUrl);
+      expect(download.status).toBe(200);
+      expect(download.headers.get('content-disposition')).toBe(
+        `attachment; filename="standup.mp3"; filename*=UTF-8''standup.mp3`,
+      );
+      expect(Buffer.from(await download.arrayBuffer())).toEqual(AUDIO);
+    });
+
+    it('saves a non-ASCII name through filename*', async () => {
+      const token = await signUp();
+      const meetingId = await createMeeting(token);
+      const file = await queuedFile(token, meetingId, 'Нарада.mp3');
+
+      const download = await fetch(file.downloadUrl);
+      expect(download.headers.get('content-disposition')).toBe(
+        `attachment; filename="download.mp3"; filename*=UTF-8''${encodeURIComponent('Нарада.mp3')}`,
+      );
+    });
+
+    it('issues fresh URLs on every fetch of the meeting', async () => {
+      const token = await signUp();
+      const meetingId = await createMeeting(token);
+      await queuedFile(token, meetingId);
+      const first = (await getMeeting(token, meetingId)).body as { files: ListedFile[] };
+      // Signatures carry the time to the second.
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      const second = (await getMeeting(token, meetingId)).body as { files: ListedFile[] };
+      expect(second.files[0].playbackUrl).not.toBe(first.files[0].playbackUrl);
+    });
+  });
+
+  describe('delete', () => {
+    it('removes the file from the meeting and its object from storage', async () => {
+      const token = await signUp();
+      const meetingId = await createMeeting(token);
+      const file = await queuedFile(token, meetingId);
+
+      await deleteFile(token, meetingId, file.id).expect(204);
+
+      expect((await getMeeting(token, meetingId).expect(200)).body).toMatchObject({ files: [] });
+      expect((await fetch(file.playbackUrl)).status).toBe(404);
+      await deleteFile(token, meetingId, file.id).expect(404);
+    });
+
+    it('deletes a pending upload, which frees its slot', async () => {
+      const token = await signUp();
+      const meetingId = await createMeeting(token);
+      const uploads: CreatedUpload[] = [];
+      for (let i = 0; i < 10; i++) {
+        uploads.push(
+          await createdUpload(token, meetingId, {
+            name: `part-${i}.mp3`,
+            mimeType: 'audio/mpeg',
+            size: 10,
+          }),
+        );
+      }
+      const eleventh = { name: 'part-10.mp3', mimeType: 'audio/mpeg', size: 10 };
+      await createFile(token, meetingId, eleventh).expect(409);
+
+      await deleteFile(token, meetingId, uploads[0].file.id).expect(204);
+      await createFile(token, meetingId, eleventh).expect(201);
+    });
+
+    it("answers 404 for another user's file and leaves it in place", async () => {
+      const owner = await signUp();
+      const stranger = await signUp();
+      const meetingId = await createMeeting(owner);
+      const file = await queuedFile(owner, meetingId);
+
+      await deleteFile(stranger, meetingId, file.id).expect(404);
+
+      expect((await fetch(file.playbackUrl)).status).toBe(200);
+      const meeting = await getMeeting(owner, meetingId).expect(200);
+      expect((meeting.body as { files: ListedFile[] }).files).toHaveLength(1);
+    });
+
+    it.each(['not-a-uuid', randomUUID()])('answers 404 for file id %s', async (fileId) => {
+      const token = await signUp();
+      const meetingId = await createMeeting(token);
+      await deleteFile(token, meetingId, fileId).expect(404);
     });
   });
 

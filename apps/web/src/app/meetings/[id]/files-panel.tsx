@@ -1,12 +1,11 @@
 'use client';
 
-import { CloudArrowUpIn, File, FileText, Microphone, Xmark } from '@gravity-ui/icons';
+import { CloudArrowUpIn, Xmark } from '@gravity-ui/icons';
 import { Button, Chip, ProgressBar } from '@heroui/react';
 import { useRouter } from 'next/navigation';
 import {
   type ChangeEvent,
   type DragEvent,
-  type ReactNode,
   useCallback,
   useEffect,
   useRef,
@@ -17,13 +16,13 @@ import {
   ACCEPT,
   ALLOWED_LIST,
   checkFile,
-  formatBytes,
-  kindLabel,
   MAX_FILES_PER_MEETING,
   type MeetingFileKind,
 } from '@/lib/file-types';
-import type { MeetingFile } from '@/lib/meetings';
-import { completeUpload, createUpload } from './actions';
+import type { ListedMeetingFile } from '@/lib/meetings';
+import { completeUpload, createUpload, deleteFile } from './actions';
+import { FileRow } from './file-row';
+import { DeleteFileDialog, ListedFile } from './listed-file';
 
 type Phase =
   // Registering the file with the API.
@@ -53,10 +52,21 @@ type Upload = {
 
 const ACTIVE: ReadonlySet<Phase> = new Set(['preparing', 'uploading', 'finishing']);
 
+// Listed URLs expire 15 minutes after the fetch; re-fetching more often keeps
+// Download working on a page left open.
+const URL_REFRESH_MS = 10 * 60 * 1000;
+
 // The meeting's files: a drop zone, the uploads in progress and the confirmed
-// files. Uploads go from the browser straight to storage through a presigned
-// URL; the Server Actions only register and confirm them.
-export function FilesPanel({ meetingId, files }: { meetingId: string; files: MeetingFile[] }) {
+// files (play, download, delete). Uploads go from the browser straight to
+// storage through a presigned URL; the Server Actions only register, confirm
+// and delete them.
+export function FilesPanel({
+  meetingId,
+  files: serverFiles,
+}: {
+  meetingId: string;
+  files: ListedMeetingFile[];
+}) {
   const router = useRouter();
   const [, startRefresh] = useTransition();
   const [uploads, setUploads] = useState<Upload[]>([]);
@@ -66,12 +76,36 @@ export function FilesPanel({ meetingId, files }: { meetingId: string; files: Mee
   const inputRef = useRef<HTMLInputElement>(null);
   // Per upload: the request to abort, and whether the user cancelled it.
   const controls = useRef(new Map<string, { xhr?: XMLHttpRequest; cancelled: boolean }>());
+  const listRef = useRef<HTMLUListElement>(null);
+  // The file whose player or transcript is open.
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<ListedMeetingFile | null>(null);
+  // Hidden at once, before the refreshed list arrives without them.
+  const [deletedIds, setDeletedIds] = useState<ReadonlySet<string>>(new Set());
 
-  const serverIds = new Set(files.map((file) => file.id));
-  // A finished upload stays in the list until the server's list has it.
+  const files = serverFiles.filter((file) => !deletedIds.has(file.id));
+  // A finished upload stands in for its file until the server's list has it.
+  // Hidden as soon as the server lists it (or it is deleted), and dropped
+  // from state below, so a later delete cannot bring the stand-in back.
+  const serverIds = new Set(serverFiles.map((file) => file.id));
   const visibleUploads = uploads.filter(
-    (upload) => !(upload.phase === 'done' && upload.fileId && serverIds.has(upload.fileId)),
+    (upload) =>
+      !(
+        upload.phase === 'done' &&
+        upload.fileId &&
+        (serverIds.has(upload.fileId) || deletedIds.has(upload.fileId))
+      ),
   );
+  // Adjusting state while rendering, as React recommends over an effect.
+  const listedKey = serverFiles.map((file) => file.id).join(',');
+  const [prunedFor, setPrunedFor] = useState(listedKey);
+  if (prunedFor !== listedKey) {
+    setPrunedFor(listedKey);
+    setUploads((list) => {
+      const kept = list.filter((u) => !(u.phase === 'done' && u.fileId && serverIds.has(u.fileId)));
+      return kept.length === list.length ? list : kept;
+    });
+  }
   const pending = visibleUploads.filter((u) => ACTIVE.has(u.phase) || u.phase === 'done').length;
   const freeSlots = Math.max(0, MAX_FILES_PER_MEETING - files.length - pending);
   const isUploading = uploads.some((upload) => ACTIVE.has(upload.phase));
@@ -98,7 +132,11 @@ export function FilesPanel({ meetingId, files }: { meetingId: string; files: Mee
         mimeType: file.type,
         size: file.size,
       });
-      if (control.cancelled) return;
+      if (control.cancelled) {
+        // Cancelled while the file was being registered: free its slot.
+        if (created.ok) void deleteFile(meetingId, created.file.id);
+        return;
+      }
       if (!created.ok) {
         fail(key, file.name, created.error);
         return;
@@ -208,9 +246,33 @@ export function FilesPanel({ meetingId, files }: { meetingId: string; files: Mee
     const upload = uploads.find((u) => u.key === key);
     update(key, { phase: 'cancelled' });
     if (upload) setAnnouncement(`Upload of ${upload.name} cancelled.`);
+    // The API keeps the pending file, which holds a slot, until it is deleted.
+    if (upload?.fileId) void deleteFile(meetingId, upload.fileId);
+  };
+
+  // Returns an error message for the dialog, or null when the file is gone.
+  const confirmDelete = async (file: ListedMeetingFile): Promise<string | null> => {
+    const result = await deleteFile(meetingId, file.id);
+    if (!result.ok) return result.error;
+    setDeletedIds((ids) => new Set(ids).add(file.id));
+    if (openId === file.id) setOpenId(null);
+    setToDelete(null);
+    setAnnouncement(`${file.name} deleted.`);
+    // The Delete button that opened the dialog is gone. The dialog hands focus
+    // back to it when its exit animation ends, which would drop focus to the
+    // page; once the dialog has left, put focus on the list instead.
+    focusWhenDialogCloses(() => listRef.current?.focus());
+    startRefresh(() => router.refresh());
+    return null;
   };
 
   const dismiss = (key: string) => setUploads((list) => list.filter((u) => u.key !== key));
+
+  useEffect(() => {
+    if (serverFiles.length === 0) return;
+    const timer = window.setInterval(() => startRefresh(() => router.refresh()), URL_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [router, serverFiles.length]);
 
   // Leaving the page would abort the uploads, so ask first.
   useEffect(() => {
@@ -330,7 +392,12 @@ export function FilesPanel({ meetingId, files }: { meetingId: string; files: Mee
       </p>
 
       {visibleUploads.length > 0 || files.length > 0 ? (
-        <ul aria-label="Files" className="flex flex-col divide-y divide-separator">
+        <ul
+          ref={listRef}
+          aria-label="Files"
+          className="flex flex-col divide-y divide-separator rounded-lg outline-none focus-visible:focus-ring"
+          tabIndex={-1}
+        >
           {visibleUploads.map((upload) => (
             <UploadRow
               key={upload.key}
@@ -340,14 +407,22 @@ export function FilesPanel({ meetingId, files }: { meetingId: string; files: Mee
             />
           ))}
           {files.map((file) => (
-            <FileRow key={file.id} kind={file.kind} name={file.name} size={file.size}>
-              <Chip className="shrink-0" size="sm" variant="soft">
-                Queued
-              </Chip>
-            </FileRow>
+            <ListedFile
+              key={file.id}
+              file={file}
+              isOpen={openId === file.id}
+              onDelete={() => setToDelete(file)}
+              onToggle={() => setOpenId((id) => (id === file.id ? null : file.id))}
+            />
           ))}
         </ul>
       ) : null}
+
+      <DeleteFileDialog
+        file={toDelete}
+        onClose={() => setToDelete(null)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
@@ -365,11 +440,16 @@ function UploadRow({
 
   if (phase === 'done') {
     return (
-      <FileRow kind={kind} name={name} size={size}>
-        <Chip className="shrink-0" size="sm" variant="soft">
-          Queued
-        </Chip>
-      </FileRow>
+      <FileRow
+        kind={kind}
+        name={name}
+        size={size}
+        status={
+          <Chip size="sm" variant="soft">
+            Queued
+          </Chip>
+        }
+      />
     );
   }
 
@@ -440,37 +520,16 @@ function UploadRow({
   );
 }
 
-function FileRow({
-  name,
-  size,
-  kind,
-  note,
-  children,
-}: {
-  name: string;
-  size: number;
-  kind?: MeetingFileKind;
-  note?: ReactNode;
-  children?: ReactNode;
-}) {
-  // A refused file may have no kind: it gets a plain file icon.
-  const Icon = kind === 'TRANSCRIPT' ? FileText : kind === 'RECORDING' ? Microphone : File;
-  return (
-    <li className="flex items-center gap-3 py-3">
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-secondary text-muted">
-        <Icon aria-hidden className="size-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium" title={name}>
-          {name}
-        </p>
-        <p className="text-xs text-muted">
-          {kind ? `${kindLabel(kind)} · ` : ''}
-          {formatBytes(size)}
-        </p>
-        {note ? <div className="mt-1 text-xs">{note}</div> : null}
-      </div>
-      {children}
-    </li>
-  );
+// Runs `focus` once no alert dialog is in the DOM, checking each frame for up
+// to a second.
+function focusWhenDialogCloses(focus: () => void) {
+  const started = performance.now();
+  const check = () => {
+    if (!document.querySelector('[role=alertdialog]')) {
+      focus();
+    } else if (performance.now() - started < 1000) {
+      requestAnimationFrame(check);
+    }
+  };
+  requestAnimationFrame(check);
 }

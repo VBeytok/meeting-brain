@@ -17,6 +17,8 @@ export type CreateUploadResult =
 
 export type CompleteUploadResult = { ok: true; file: MeetingFile } | { ok: false; error: string };
 
+export type DeleteFileResult = { ok: true } | { ok: false; error: string };
+
 // Registers a file with the API and returns where to upload it. The browser
 // never calls the API itself; it only talks to storage, with a presigned URL.
 export async function createUpload(
@@ -24,9 +26,7 @@ export async function createUpload(
   file: { name: string; mimeType: string; size: number },
 ): Promise<CreateUploadResult> {
   const response = await callApi(`/meetings/${encodeURIComponent(meetingId)}/files`, {
-    name: file.name,
-    mimeType: file.mimeType,
-    size: file.size,
+    body: { name: file.name, mimeType: file.mimeType, size: file.size },
   });
   if ('error' in response) return { ok: false, error: response.error };
 
@@ -51,11 +51,30 @@ export async function completeUpload(
   return file?.id ? { ok: true, file } : { ok: false, error: GENERIC_ERROR };
 }
 
+// Removes a file and its stored object, confirmed or still uploading (that is
+// how Cancel frees the file's slot). A file that is already gone counts as
+// deleted.
+export async function deleteFile(meetingId: string, fileId: string): Promise<DeleteFileResult> {
+  const response = await callApi(
+    `/meetings/${encodeURIComponent(meetingId)}/files/${encodeURIComponent(fileId)}`,
+    { method: 'DELETE', notFoundIsOk: true },
+  );
+  return 'error' in response ? { ok: false, error: response.error } : { ok: true };
+}
+
 const GENERIC_ERROR = 'Something went wrong on our side. Try again.';
 
-// POSTs to the API as the signed-in user. A missing or rejected session
-// redirects to /login; other failures become a message for the file's row.
-async function callApi(path: string, body?: object): Promise<Response | { error: string }> {
+// Calls the API as the signed-in user (POST unless told otherwise). A missing
+// or rejected session redirects to /login; other failures become a message
+// for the file's row.
+async function callApi(
+  path: string,
+  {
+    method = 'POST',
+    body,
+    notFoundIsOk = false,
+  }: { method?: 'POST' | 'DELETE'; body?: object; notFoundIsOk?: boolean } = {},
+): Promise<Response | { error: string }> {
   const session = await getSession();
   if (!session) {
     redirect('/login');
@@ -64,7 +83,7 @@ async function callApi(path: string, body?: object): Promise<Response | { error:
   let response: Response;
   try {
     response = await fetch(`${API_URL}${path}`, {
-      method: 'POST',
+      method,
       headers: {
         Authorization: `Bearer ${session.accessToken}`,
         ...(body ? { 'Content-Type': 'application/json' } : {}),
@@ -78,7 +97,7 @@ async function callApi(path: string, body?: object): Promise<Response | { error:
   if (response.status === 401) {
     redirect('/login');
   }
-  if (response.ok) {
+  if (response.ok || (notFoundIsOk && response.status === 404)) {
     return response;
   }
   if (response.status === 404) {

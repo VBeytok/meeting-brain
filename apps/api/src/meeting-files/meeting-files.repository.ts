@@ -92,6 +92,11 @@ export class MeetingFilesRepository {
     return file && toDto(file);
   }
 
+  // deleteMany, so a row a concurrent request already removed is not an error.
+  async delete(id: string): Promise<void> {
+    await this.prisma.meetingFile.deleteMany({ where: { id } });
+  }
+
   async findOne(id: string): Promise<StoredMeetingFile | null> {
     const file = await this.prisma.meetingFile.findUnique({ where: { id } });
     return file && toDto(file);
