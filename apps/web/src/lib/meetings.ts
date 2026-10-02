@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { cache } from 'react';
+import type { MeetingFileKind } from './file-types';
 import { API_URL } from './api';
 import type { Session } from './session';
 
@@ -10,6 +11,24 @@ export interface Meeting {
   // ISO 8601, UTC.
   date: string;
   participants: string[];
+}
+
+// Mirrors the API's MeetingFileDto.
+export interface MeetingFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  // Bytes.
+  size: number;
+  kind: MeetingFileKind;
+  status: 'PENDING_UPLOAD' | 'QUEUED';
+  // ISO 8601, UTC.
+  createdAt: string;
+}
+
+// Mirrors the API's MeetingDetailsDto: one meeting with its confirmed files.
+export interface MeetingDetails extends Meeting {
+  files: MeetingFile[];
 }
 
 // The caller's meetings, earliest first, or null when the API cannot be
@@ -35,7 +54,7 @@ export async function getMeetings(session: Session): Promise<Meeting[] | null> {
 }
 
 export type MeetingResult =
-  { status: 'found'; meeting: Meeting } | { status: 'not-found' } | { status: 'error' };
+  { status: 'found'; meeting: MeetingDetails } | { status: 'not-found' } | { status: 'error' };
 
 // Any UUID, like the API's isUUID check on meeting ids.
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -69,6 +88,6 @@ export const getMeeting = cache(async (session: Session, id: string): Promise<Me
   if (!response.ok) {
     return { status: 'error' };
   }
-  const meeting = (await response.json().catch(() => null)) as Meeting | null;
+  const meeting = (await response.json().catch(() => null)) as MeetingDetails | null;
   return meeting ? { status: 'found', meeting } : { status: 'error' };
 });

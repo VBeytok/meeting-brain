@@ -8,16 +8,22 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { UsersModule } from './users/users.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { validateEnv } from './config/env.js';
+import { validateStorageEnv } from './config/storage-env.js';
 import { MeetingsModule } from './meetings/meetings.module.js';
+import { MeetingFilesModule } from './meeting-files/meeting-files.module.js';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validate: (raw) => ({ ...validateEnv(raw), ...validateStorageEnv(raw) }),
+    }),
     CqrsModule.forRoot(),
     PrismaModule,
     UsersModule,
     AuthModule,
     MeetingsModule,
+    MeetingFilesModule,
   ],
   controllers: [AppController],
   providers: [

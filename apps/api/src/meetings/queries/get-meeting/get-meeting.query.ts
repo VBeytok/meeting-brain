@@ -1,7 +1,7 @@
 import { Query } from '@nestjs/cqrs';
-import type { MeetingDto } from '../../dto/meeting.dto.js';
+import type { MeetingDetailsDto } from '../../dto/meeting-details.dto.js';
 
-export class GetMeetingQuery extends Query<MeetingDto> {
+export class GetMeetingQuery extends Query<MeetingDetailsDto> {
   constructor(
     readonly id: string,
     readonly ownerId: string,

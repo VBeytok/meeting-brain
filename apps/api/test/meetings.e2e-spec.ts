@@ -219,13 +219,14 @@ describe('Meetings (e2e)', () => {
   });
 
   describe('GET /meetings/:id', () => {
-    it('returns the meeting', async () => {
+    it('returns the meeting with its files', async () => {
       const token = await signUp();
       const meeting = await createdMeeting(token);
 
       const res = await getMeeting(token, meeting.id).expect(200);
 
-      expect(res.body).toEqual(meeting);
+      // Files are covered in meeting-files.e2e-spec.ts.
+      expect(res.body).toEqual({ ...meeting, files: [] });
     });
 
     // Creating a meeting first proves the route exists, so the 404 comes from the lookup.
