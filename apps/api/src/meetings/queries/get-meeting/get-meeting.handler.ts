@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { QueryBus, QueryHandler, type IQueryHandler } from '@nestjs/cqrs';
 import { isUUID } from 'class-validator';
+import { GetMeetingAnalysisQuery } from '../../../meeting-analysis/queries/get-meeting-analysis/get-meeting-analysis.query.js';
 import { ListMeetingFilesQuery } from '../../../meeting-files/queries/list-meeting-files/list-meeting-files.query.js';
 import type { MeetingDetailsDto } from '../../dto/meeting-details.dto.js';
 import { MeetingsRepository } from '../../meetings.repository.js';
@@ -20,7 +21,10 @@ export class GetMeetingHandler implements IQueryHandler<GetMeetingQuery> {
     if (!meeting) {
       throw new NotFoundException('Meeting not found');
     }
-    const files = await this.queryBus.execute(new ListMeetingFilesQuery(meeting.id));
-    return { ...meeting, files };
+    const [files, analysis] = await Promise.all([
+      this.queryBus.execute(new ListMeetingFilesQuery(meeting.id)),
+      this.queryBus.execute(new GetMeetingAnalysisQuery(meeting.id)),
+    ]);
+    return { ...meeting, files, analysis };
   }
 }

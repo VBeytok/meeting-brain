@@ -12,7 +12,9 @@ import { ProcessMeetingFileHandler } from './commands/process-meeting-file/proce
 import { RetryMeetingFileHandler } from './commands/retry-meeting-file/retry-meeting-file.handler.js';
 import { MeetingFilesController } from './meeting-files.controller.js';
 import { MeetingFilesRepository } from './meeting-files.repository.js';
+import { FileOutcomes } from './processing/file-outcomes.js';
 import { MeetingFileProcessor } from './processing/meeting-file-processor.js';
+import { GetAnalysisInputHandler } from './queries/get-analysis-input/get-analysis-input.handler.js';
 import { ListMeetingFilesHandler } from './queries/list-meeting-files/list-meeting-files.handler.js';
 
 // Files attached to meetings. Reaches meetings only through the buses.
@@ -27,8 +29,10 @@ import { ListMeetingFilesHandler } from './queries/list-meeting-files/list-meeti
     ProcessMeetingFileHandler,
     CheckTranscriptionHandler,
     RetryMeetingFileHandler,
+    FileOutcomes,
     MeetingFileProcessor,
     ListMeetingFilesHandler,
+    GetAnalysisInputHandler,
   ],
 })
 export class MeetingFilesModule {}

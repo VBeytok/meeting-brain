@@ -4,6 +4,7 @@ import { MeetingFileKind, MeetingFileStatus } from '../../../generated/prisma/cl
 import { JobQueue } from '../../../queue/job-queue.js';
 import { FileStorage } from '../../../storage/file-storage.js';
 import { Transcriber, TranscriptionRejectedError } from '../../../transcription/transcriber.js';
+import { FileOutcomes } from '../../processing/file-outcomes.js';
 import { MeetingFilesRepository, type StoredMeetingFile } from '../../meeting-files.repository.js';
 import {
   CHECK_TRANSCRIPTION_QUEUE,
@@ -29,6 +30,7 @@ export class ProcessMeetingFileHandler implements ICommandHandler<ProcessMeeting
 
   constructor(
     private readonly files: MeetingFilesRepository,
+    private readonly outcomes: FileOutcomes,
     private readonly storage: FileStorage,
     private readonly transcriber: Transcriber,
     private readonly queue: JobQueue,
@@ -47,16 +49,16 @@ export class ProcessMeetingFileHandler implements ICommandHandler<ProcessMeeting
       }
     } catch (error) {
       if (error instanceof TranscriptParseError) {
-        await this.files.markFailed(file.id, error.message);
+        await this.outcomes.failed(file, error.message);
         return;
       }
       if (error instanceof TranscriptionRejectedError) {
-        await this.files.markFailed(file.id, `Transcription failed: ${error.message}`);
+        await this.outcomes.failed(file, `Transcription failed: ${error.message}`);
         return;
       }
       this.logger.error(`Processing file ${file.id} failed`, error);
       if (isLastAttempt) {
-        await this.files.markFailed(file.id, UNEXPECTED);
+        await this.outcomes.failed(file, UNEXPECTED);
         return;
       }
       throw error;
@@ -72,13 +74,13 @@ export class ProcessMeetingFileHandler implements ICommandHandler<ProcessMeeting
       throw new TranscriptParseError(MISSING);
     }
     const transcript = parseTranscript(file.name, decodeUtf8(bytes));
-    await this.files.markReady(file.id, transcript);
+    await this.outcomes.ready(file, transcript);
   }
 
   private async submit(file: StoredMeetingFile): Promise<void> {
     const audio = await this.storage.openRead(file.storageKey);
     if (!audio) {
-      await this.files.markFailed(file.id, MISSING);
+      await this.outcomes.failed(file, MISSING);
       return;
     }
     const transcriptionId = await this.transcriber.submit(audio);

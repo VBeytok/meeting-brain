@@ -64,9 +64,12 @@ const POLL_MS = 5000;
 export function FilesPanel({
   meetingId,
   files: serverFiles,
+  analysisInProgress,
 }: {
   meetingId: string;
   files: ListedMeetingFile[];
+  // The summary is being rebuilt: keep polling until it is done.
+  analysisInProgress: boolean;
 }) {
   const router = useRouter();
   const [, startRefresh] = useTransition();
@@ -269,12 +272,13 @@ export function FilesPanel({
 
   const dismiss = (key: string) => setUploads((list) => list.filter((u) => u.key !== key));
 
-  // Re-fetch every 5 seconds while a file is being processed (parsed or
-  // transcribed), to show the result; otherwise every 10 minutes while files
-  // are listed, to keep their URLs valid.
-  const isProcessing = serverFiles.some(
-    (file) => file.status === 'QUEUED' || file.status === 'TRANSCRIBING',
-  );
+  // Re-fetch the page every 5 seconds while a file is being processed
+  // (parsed or transcribed) or the summary rebuilt, to show the result;
+  // otherwise every 10 minutes while files are listed, to keep their URLs
+  // valid.
+  const isProcessing =
+    analysisInProgress ||
+    serverFiles.some((file) => file.status === 'QUEUED' || file.status === 'TRANSCRIBING');
   const refreshEvery = isProcessing ? POLL_MS : serverFiles.length > 0 ? URL_REFRESH_MS : null;
   useEffect(() => {
     if (refreshEvery === null) return;

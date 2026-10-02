@@ -10,8 +10,10 @@ import { AuthModule } from './auth/auth.module.js';
 import { validateEnv } from './config/env.js';
 import { validateStorageEnv } from './config/storage-env.js';
 import { validateTranscriptionEnv } from './config/transcription-env.js';
+import { validateAnalysisEnv } from './config/analysis-env.js';
 import { MeetingsModule } from './meetings/meetings.module.js';
 import { MeetingFilesModule } from './meeting-files/meeting-files.module.js';
+import { MeetingAnalysisModule } from './meeting-analysis/meeting-analysis.module.js';
 
 @Module({
   imports: [
@@ -21,6 +23,7 @@ import { MeetingFilesModule } from './meeting-files/meeting-files.module.js';
         ...validateEnv(raw),
         ...validateStorageEnv(raw),
         ...validateTranscriptionEnv(raw),
+        ...validateAnalysisEnv(raw),
       }),
     }),
     CqrsModule.forRoot(),
@@ -29,6 +32,7 @@ import { MeetingFilesModule } from './meeting-files/meeting-files.module.js';
     AuthModule,
     MeetingsModule,
     MeetingFilesModule,
+    MeetingAnalysisModule,
   ],
   controllers: [AppController],
   providers: [
