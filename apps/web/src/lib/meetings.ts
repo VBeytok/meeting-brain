@@ -56,8 +56,32 @@ export interface ListedMeetingFile extends MeetingFile {
 }
 
 // Mirrors the API's MeetingDetailsDto: one meeting with its confirmed files.
+// Mirrors the API's MeetingAnalysisDto.
+export interface ActionItem {
+  text: string;
+  owner?: string;
+  dueDate?: string;
+}
+
+export interface MeetingAnalysis {
+  // PENDING: a rebuild waits for files to finish processing. RUNNING: being
+  // written. READY. FAILED: `error` says why.
+  status: 'PENDING' | 'RUNNING' | 'READY' | 'FAILED';
+  // The last successful build, kept during a rebuild; null before the first.
+  summary: string | null;
+  actionItems: ActionItem[];
+  decisions: string[];
+  language: string | null;
+  // FAILED files the last build left out.
+  skippedFileIds: string[];
+  error: string | null;
+  generatedAt: string | null;
+}
+
 export interface MeetingDetails extends Meeting {
   files: ListedMeetingFile[];
+  // null until a file of the meeting is processed.
+  analysis: MeetingAnalysis | null;
 }
 
 // The caller's meetings, earliest first, or null when the API cannot be

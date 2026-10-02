@@ -1,7 +1,9 @@
 import { NotFoundException } from '@nestjs/common';
-import { CommandHandler, type ICommandHandler } from '@nestjs/cqrs';
+import { CommandHandler, EventBus, type ICommandHandler } from '@nestjs/cqrs';
 import { isUUID } from 'class-validator';
+import { MeetingFileStatus } from '../../../generated/prisma/client.js';
 import { FileStorage } from '../../../storage/file-storage.js';
+import { MeetingFilesChangedEvent } from '../../events/meeting-files-changed.event.js';
 import { MeetingFilesRepository } from '../../meeting-files.repository.js';
 import { DeleteMeetingFileCommand } from './delete-meeting-file.command.js';
 
@@ -12,6 +14,7 @@ export class DeleteMeetingFileHandler implements ICommandHandler<DeleteMeetingFi
   constructor(
     private readonly files: MeetingFilesRepository,
     private readonly storage: FileStorage,
+    private readonly events: EventBus,
   ) {}
 
   async execute({ fileId, meetingId, ownerId }: DeleteMeetingFileCommand): Promise<void> {
@@ -27,5 +30,9 @@ export class DeleteMeetingFileHandler implements ICommandHandler<DeleteMeetingFi
     // leave an object no row points to.
     await this.storage.delete(file.storageKey);
     await this.files.delete(file.id);
+    // A pending upload was never part of the meeting's processed files.
+    if (file.status !== MeetingFileStatus.PENDING_UPLOAD) {
+      this.events.publish(new MeetingFilesChangedEvent(file.meetingId));
+    }
   }
 }

@@ -12,6 +12,10 @@ export type QueueSettings = {
   // Jobs this process runs at once. Each worker takes one job and then waits
   // POLLING_SECONDS before the next, so this is also the throughput.
   concurrency: number;
+  // `stately`: at most one job per `singletonKey` waiting and one running; a
+  // send while one is already waiting is dropped. Set when the queue is
+  // created; pg-boss cannot change it later. Default `standard`.
+  policy?: 'standard' | 'stately';
 };
 
 const POLLING_SECONDS = 1;
@@ -58,7 +62,7 @@ export class JobQueue implements OnModuleInit, OnApplicationShutdown {
     if (await this.boss.getQueue(name)) {
       await this.boss.updateQueue(name, options);
     } else {
-      await this.boss.createQueue(name, options);
+      await this.boss.createQueue(name, { ...options, policy: settings.policy ?? 'standard' });
     }
     this.settings.set(name, settings);
   }

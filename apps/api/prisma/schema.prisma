@@ -21,15 +21,16 @@ model User {
 }
 
 model Meeting {
-  id           String        @id @default(uuid(7)) @db.Uuid
+  id           String           @id @default(uuid(7)) @db.Uuid
   title        String
-  date         DateTime      @db.Timestamptz(3)
+  date         DateTime         @db.Timestamptz(3)
   participants String[]
-  ownerId      String        @map("owner_id") @db.Uuid
-  owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId      String           @map("owner_id") @db.Uuid
+  owner        User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   files        MeetingFile[]
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  analysis     MeetingAnalysis?
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([ownerId])
   @@map("meetings")
@@ -83,4 +84,42 @@ model MeetingFile {
 
   @@index([meetingId])
   @@map("meeting_files")
+}
+
+enum MeetingAnalysisStatus {
+  // Files changed since the last build; a job will (re)build it once no file
+  // is still uploading or processing.
+  PENDING
+  // The analyzer is working on it.
+  RUNNING
+  READY
+  // The analyzer gave up; `error` says why. Retry moves it back to PENDING.
+  FAILED
+
+  @@map("meeting_analysis_status")
+}
+
+// Summary, action items and decisions of a meeting, built from its READY
+// files. One per meeting; removed when no READY file is left.
+model MeetingAnalysis {
+  id             String                @id @default(uuid(7)) @db.Uuid
+  meetingId      String                @unique @map("meeting_id") @db.Uuid
+  meeting        Meeting               @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  status         MeetingAnalysisStatus @default(PENDING)
+  // The last successful build. Kept while a rebuild is PENDING or RUNNING.
+  summary        String?
+  // [{ text, owner?, dueDate? }]
+  actionItems    Json?                 @map("action_items")
+  // [string]
+  decisions      Json?
+  // BCP 47 tag of the language the analysis is written in.
+  language       String?
+  // FAILED files left out of the last build.
+  skippedFileIds String[]              @default([]) @map("skipped_file_ids") @db.Uuid
+  error          String?
+  generatedAt    DateTime?             @map("generated_at") @db.Timestamptz(3)
+  createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("meeting_analyses")
 }

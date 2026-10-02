@@ -35,10 +35,13 @@ const MEETING = {
 };
 const AUDIO = Buffer.from('ID3 not really an mp3, but storage does not care');
 
-// Recordings go to FakeTranscriber, which answers at once, whatever .env says.
+// Recordings go to FakeTranscriber and analyses to FakeAnalyzer, which answer
+// at once, whatever .env says.
 // Set before AppModule loads its config; .env does not override them.
 process.env.ASSEMBLYAI_API_KEY = '';
 process.env.FAKE_TRANSCRIPTION_DELAY_SECONDS = '0';
+process.env.ANTHROPIC_API_KEY = '';
+process.env.FAKE_ANALYSIS_DELAY_SECONDS = '0';
 
 describe('Meeting files (e2e)', () => {
   let app: INestApplication<App>;

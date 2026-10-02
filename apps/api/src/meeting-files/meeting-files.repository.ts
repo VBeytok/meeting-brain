@@ -17,9 +17,10 @@ type NewMeetingFile = {
   kind: MeetingFileKind;
 };
 
-// The stored record, with the storage key and the transcription provider's
-// job id, which the API keeps to itself.
+// The stored record, with its meeting, its storage key and the transcription
+// provider's job id, which the API keeps to itself.
 export type StoredMeetingFile = MeetingFileDto & {
+  meetingId: string;
   storageKey: string;
   transcriptionId: string | null;
 };
@@ -38,6 +39,7 @@ const toDto = (file: MeetingFile): StoredMeetingFile => ({
   transcript: file.transcript as Transcript | null,
   error: file.error,
   createdAt: file.createdAt.toISOString(),
+  meetingId: file.meetingId,
   storageKey: file.storageKey,
   transcriptionId: file.transcriptionId,
 });
@@ -145,6 +147,15 @@ export class MeetingFilesRepository {
       data: { status: MeetingFileStatus.QUEUED, error: null },
     });
     return count > 0;
+  }
+
+  // Every file of the meeting, pending uploads included, oldest first.
+  async findAllByMeeting(meetingId: string): Promise<StoredMeetingFile[]> {
+    const files = await this.prisma.meetingFile.findMany({
+      where: { meetingId },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+    return files.map(toDto);
   }
 
   async findOne(id: string): Promise<StoredMeetingFile | null> {

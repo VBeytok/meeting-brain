@@ -6,6 +6,7 @@ import { MeetingDateBadge, MeetingStatusChip, participantCount } from '@/compone
 import { RetryButton } from '@/components/retry-button';
 import { dateTimeFormat, isUpcoming } from '@/lib/dates';
 import { getMeeting } from '@/lib/meetings';
+import { AnalysisPanel } from './analysis-panel';
 import { FilesPanel } from './files-panel';
 import type { Session } from '@/lib/session';
 
@@ -52,17 +53,24 @@ export async function MeetingDetails({ session, id }: { session: Session; id: st
             icon={ListCheck}
             title="Summary"
           >
-            <Placeholder>
-              Nothing to summarize yet. Once a recording or transcript of this meeting is processed,
-              the summary will appear here.
-            </Placeholder>
+            <AnalysisPanel
+              analysis={meeting.analysis ?? null}
+              files={meeting.files ?? []}
+              meetingId={meeting.id}
+            />
           </Section>
           <Section
             description="Recordings and transcripts of this meeting."
             icon={FileText}
             title="Files"
           >
-            <FilesPanel files={meeting.files ?? []} meetingId={meeting.id} />
+            <FilesPanel
+              analysisInProgress={
+                meeting.analysis?.status === 'PENDING' || meeting.analysis?.status === 'RUNNING'
+              }
+              files={meeting.files ?? []}
+              meetingId={meeting.id}
+            />
           </Section>
         </div>
 

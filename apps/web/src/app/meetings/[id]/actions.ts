@@ -21,6 +21,8 @@ export type DeleteFileResult = { ok: true } | { ok: false; error: string };
 
 export type RetryFileResult = { ok: true } | { ok: false; error: string };
 
+export type RetryAnalysisResult = RetryFileResult;
+
 // Registers a file with the API and returns where to upload it. The browser
 // never calls the API itself; it only talks to storage, with a presigned URL.
 export async function createUpload(
@@ -69,6 +71,12 @@ export async function retryFile(meetingId: string, fileId: string): Promise<Retr
   const response = await callApi(
     `/meetings/${encodeURIComponent(meetingId)}/files/${encodeURIComponent(fileId)}/retry`,
   );
+  return 'error' in response ? { ok: false, error: response.error } : { ok: true };
+}
+
+// Rebuilds a summary that failed.
+export async function retryAnalysis(meetingId: string): Promise<RetryAnalysisResult> {
+  const response = await callApi(`/meetings/${encodeURIComponent(meetingId)}/analysis/retry`);
   return 'error' in response ? { ok: false, error: response.error } : { ok: true };
 }
 

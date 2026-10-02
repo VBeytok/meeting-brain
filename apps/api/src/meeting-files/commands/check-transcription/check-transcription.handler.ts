@@ -3,6 +3,7 @@ import { CommandHandler, type ICommandHandler } from '@nestjs/cqrs';
 import { MeetingFileStatus } from '../../../generated/prisma/client.js';
 import { JobQueue } from '../../../queue/job-queue.js';
 import { Transcriber } from '../../../transcription/transcriber.js';
+import { FileOutcomes } from '../../processing/file-outcomes.js';
 import { MeetingFilesRepository } from '../../meeting-files.repository.js';
 import {
   CHECK_TRANSCRIPTION_QUEUE,
@@ -22,6 +23,7 @@ export class CheckTranscriptionHandler implements ICommandHandler<CheckTranscrip
 
   constructor(
     private readonly files: MeetingFilesRepository,
+    private readonly outcomes: FileOutcomes,
     private readonly transcriber: Transcriber,
     private readonly queue: JobQueue,
   ) {}
@@ -40,15 +42,15 @@ export class CheckTranscriptionHandler implements ICommandHandler<CheckTranscrip
     try {
       const status = await this.transcriber.check(job.transcriptionId);
       if (status.state === 'failed') {
-        await this.files.markFailed(file.id, `Transcription failed: ${status.error}`);
+        await this.outcomes.failed(file, `Transcription failed: ${status.error}`);
       } else if (status.state === 'completed') {
         if (status.transcript.segments.length === 0) {
-          await this.files.markFailed(file.id, 'No speech was found in the recording.');
+          await this.outcomes.failed(file, 'No speech was found in the recording.');
         } else {
-          await this.files.markReady(file.id, status.transcript);
+          await this.outcomes.ready(file, status.transcript);
         }
       } else if (Date.now() - job.submittedAt > MAX_TRANSCRIPTION_MS) {
-        await this.files.markFailed(file.id, 'Transcription took too long. Try again.');
+        await this.outcomes.failed(file, 'Transcription took too long. Try again.');
       } else {
         await this.queue.send<CheckTranscriptionJob>(CHECK_TRANSCRIPTION_QUEUE, job, {
           startAfter: POLL_SECONDS,
@@ -57,7 +59,7 @@ export class CheckTranscriptionHandler implements ICommandHandler<CheckTranscrip
     } catch (error) {
       this.logger.error(`Checking transcription of file ${file.id} failed`, error);
       if (isLastAttempt) {
-        await this.files.markFailed(file.id, UNEXPECTED);
+        await this.outcomes.failed(file, UNEXPECTED);
         return;
       }
       throw error;
