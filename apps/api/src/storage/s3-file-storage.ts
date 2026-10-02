@@ -72,6 +72,20 @@ export class S3FileStorage extends FileStorage implements OnModuleDestroy {
     return getSignedUrl(this.publicClient, command, { expiresIn: options.expiresInSeconds });
   }
 
+  async read(key: string): Promise<Uint8Array | null> {
+    try {
+      const object = await this.client.send(
+        new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+      );
+      return object.Body ? await object.Body.transformToByteArray() : new Uint8Array();
+    } catch (error) {
+      if (error instanceof S3ServiceException && error.$metadata.httpStatusCode === 404) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
   async delete(key: string): Promise<void> {
     // S3 answers 204 for a missing key too.
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));

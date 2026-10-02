@@ -8,6 +8,7 @@ import { App } from 'supertest/types.js';
 import { AppModule } from './../src/app.module.js';
 import type { StorageEnv } from './../src/config/storage-env.js';
 
+type Segment = { start?: number; end?: number; speaker?: string; text: string };
 type MeetingFile = {
   id: string;
   name: string;
@@ -15,6 +16,8 @@ type MeetingFile = {
   size: number;
   kind: string;
   status: string;
+  transcript: { language: string | null; segments: Segment[] } | null;
+  error: string | null;
   createdAt: string;
 };
 // A confirmed file as GET /meetings/:id lists it.
@@ -147,6 +150,8 @@ describe('Meeting files (e2e)', () => {
         size: AUDIO.length,
         kind: 'RECORDING',
         status: 'PENDING_UPLOAD',
+        transcript: null,
+        error: null,
       });
       expect(upload.uploadHeaders).toEqual({ 'Content-Type': 'audio/mpeg' });
       expect(storageKey(upload)).toMatch(new RegExp(`^meetings/${meetingId}/[0-9a-f-]{36}$`));
@@ -338,6 +343,150 @@ describe('Meeting files (e2e)', () => {
       const token = await signUp();
       const meetingId = await createMeeting(token);
       await deleteFile(token, meetingId, fileId).expect(404);
+    });
+  });
+
+  // Uploads `text` as a transcript file and confirms it, which queues parsing.
+  async function queuedTranscript(token: string, meetingId: string, name: string, text: string) {
+    const bytes = Buffer.from(text, 'utf8');
+    const mimeType = name.endsWith('.vtt') ? 'text/vtt' : name.endsWith('.srt') ? '' : 'text/plain';
+    const upload = await createdUpload(token, meetingId, { name, mimeType, size: bytes.length });
+    expect((await put(upload, bytes)).status).toBe(200);
+    await complete(token, meetingId, upload.file.id).expect(200);
+    return upload.file.id;
+  }
+
+  // Polls the meeting until the file leaves QUEUED, as the web app does.
+  async function settled(token: string, meetingId: string, fileId: string): Promise<ListedFile> {
+    for (let i = 0; i < 100; i++) {
+      const meeting = await getMeeting(token, meetingId).expect(200);
+      const file = (meeting.body as { files: ListedFile[] }).files.find((f) => f.id === fileId);
+      if (file && file.status !== 'QUEUED') return file;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    throw new Error(`File ${fileId} is still QUEUED`);
+  }
+
+  const retry = (token: string, meetingId: string, fileId: string) =>
+    request(app.getHttpServer())
+      .post(`/meetings/${meetingId}/files/${fileId}/retry`)
+      .auth(token, { type: 'bearer' });
+
+  describe('transcript processing', () => {
+    it('parses a WebVTT file into timed segments with speakers', async () => {
+      const token = await signUp();
+      const meetingId = await createMeeting(token);
+      const fileId = await queuedTranscript(
+        token,
+        meetingId,
+        'captions.vtt',
+        [
+          'WEBVTT',
+          'Language: en',
+          '',
+          '00:00:01.000 --> 00:00:03.000',
+          '<v Alice>Shall we start?',
+          '',
+          '00:00:03.500 --> 00:00:05.000',
+          '<v Bob>Yes, go ahead.',
+        ].join('\n'),
+      );
+
+      const file = await settled(token, meetingId, fileId);
+      expect(file).toMatchObject({ status: 'READY', error: null });
+      expect(file.transcript).toEqual({
+        language: 'en',
+        segments: [
+          { start: 1, end: 3, speaker: 'Alice', text: 'Shall we start?' },
+          { start: 3.5, end: 5, speaker: 'Bob', text: 'Yes, go ahead.' },
+        ],
+      });
+    });
+
+    it('parses an SRT file', async () => {
+      const token = await signUp();
+      const meetingId = await createMeeting(token);
+      const fileId = await queuedTranscript(
+        token,
+        meetingId,
+        'captions.srt',
+        '1\r\n00:00:01,000 --> 00:00:02,000\r\nHello.\r\n\r\n2\r\n00:00:02,500 --> 00:00:04,000\r\nGoodbye.\r\n',
+      );
+      const file = await settled(token, meetingId, fileId);
+      expect(file.status).toBe('READY');
+      expect(file.transcript?.segments).toEqual([
+        { start: 1, end: 2, text: 'Hello.' },
+        { start: 2.5, end: 4, text: 'Goodbye.' },
+      ]);
+    });
+
+    it('keeps a text file as one segment', async () => {
+      const token = await signUp();
+      const meetingId = await createMeeting(token);
+      const fileId = await queuedTranscript(
+        token,
+        meetingId,
+        'notes.txt',
+        'Alice: hi\nBob: hello\n',
+      );
+      const file = await settled(token, meetingId, fileId);
+      expect(file.transcript).toEqual({
+        language: null,
+        segments: [{ text: 'Alice: hi\nBob: hello' }],
+      });
+    });
+
+    it('fails a malformed file with a reason, and retries only a failed one', async () => {
+      const token = await signUp();
+      const meetingId = await createMeeting(token);
+      const fileId = await queuedTranscript(token, meetingId, 'broken.vtt', 'Not a caption file');
+
+      const failed = await settled(token, meetingId, fileId);
+      expect(failed).toMatchObject({ status: 'FAILED', transcript: null });
+      expect(failed.error).toMatch(/WEBVTT/);
+
+      const retried = await retry(token, meetingId, fileId).expect(200);
+      expect(retried.body).toMatchObject({ id: fileId, status: 'QUEUED', error: null });
+      // The same bytes fail the same way.
+      expect((await settled(token, meetingId, fileId)).status).toBe('FAILED');
+
+      const ready = await queuedTranscript(token, meetingId, 'ok.txt', 'Fine');
+      await settled(token, meetingId, ready);
+      await retry(token, meetingId, ready).expect(409);
+    });
+
+    it('answers 409 when retrying a file that is still uploading', async () => {
+      const token = await signUp();
+      const meetingId = await createMeeting(token);
+      const upload = await createdUpload(token, meetingId);
+      await retry(token, meetingId, upload.file.id).expect(409);
+    });
+
+    it('leaves a recording queued: transcription comes later', async () => {
+      const token = await signUp();
+      const meetingId = await createMeeting(token);
+      const file = await queuedFile(token, meetingId);
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const meeting = await getMeeting(token, meetingId).expect(200);
+      expect((meeting.body as { files: ListedFile[] }).files[0]).toMatchObject({
+        id: file.id,
+        status: 'QUEUED',
+        transcript: null,
+      });
+    });
+
+    it("answers 401 without a token and 404 for another user's file", async () => {
+      const owner = await signUp();
+      const stranger = await signUp();
+      const meetingId = await createMeeting(owner);
+      const fileId = await queuedTranscript(owner, meetingId, 'broken.vtt', 'nope');
+      await settled(owner, meetingId, fileId);
+
+      await request(app.getHttpServer())
+        .post(`/meetings/${meetingId}/files/${fileId}/retry`)
+        .expect(401);
+      await retry(stranger, meetingId, fileId).expect(404);
+      await retry(owner, meetingId, 'not-a-uuid').expect(404);
     });
   });
 

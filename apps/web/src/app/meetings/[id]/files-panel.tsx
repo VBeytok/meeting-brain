@@ -55,6 +55,7 @@ const ACTIVE: ReadonlySet<Phase> = new Set(['preparing', 'uploading', 'finishing
 // Listed URLs expire 15 minutes after the fetch; re-fetching more often keeps
 // Download working on a page left open.
 const URL_REFRESH_MS = 10 * 60 * 1000;
+const POLL_MS = 5000;
 
 // The meeting's files: a drop zone, the uploads in progress and the confirmed
 // files (play, download, delete). Uploads go from the browser straight to
@@ -268,11 +269,19 @@ export function FilesPanel({
 
   const dismiss = (key: string) => setUploads((list) => list.filter((u) => u.key !== key));
 
+  // Re-fetch every 5 seconds while a transcript is being processed, to show
+  // the result; otherwise every 10 minutes while files are listed, to keep
+  // their URLs valid. Recordings stay QUEUED until transcription exists, so
+  // they do not count as processing.
+  const isProcessing = serverFiles.some(
+    (file) => file.kind === 'TRANSCRIPT' && file.status === 'QUEUED',
+  );
+  const refreshEvery = isProcessing ? POLL_MS : serverFiles.length > 0 ? URL_REFRESH_MS : null;
   useEffect(() => {
-    if (serverFiles.length === 0) return;
-    const timer = window.setInterval(() => startRefresh(() => router.refresh()), URL_REFRESH_MS);
+    if (refreshEvery === null) return;
+    const timer = window.setInterval(() => startRefresh(() => router.refresh()), refreshEvery);
     return () => window.clearInterval(timer);
-  }, [router, serverFiles.length]);
+  }, [router, refreshEvery]);
 
   // Leaving the page would abort the uploads, so ask first.
   useEffect(() => {
@@ -410,6 +419,7 @@ export function FilesPanel({
             <ListedFile
               key={file.id}
               file={file}
+              meetingId={meetingId}
               isOpen={openId === file.id}
               onDelete={() => setToDelete(file)}
               onToggle={() => setOpenId((id) => (id === file.id ? null : file.id))}

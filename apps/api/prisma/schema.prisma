@@ -47,6 +47,10 @@ enum MeetingFileStatus {
   PENDING_UPLOAD
   // The upload is confirmed and waits for processing.
   QUEUED
+  // Processed: a transcript file is parsed into `transcript`.
+  READY
+  // Processing gave up; `error` says why. Retry moves it back to QUEUED.
+  FAILED
 
   @@map("meeting_file_status")
 }
@@ -64,6 +68,10 @@ model MeetingFile {
   size         Int
   kind         MeetingFileKind
   status       MeetingFileStatus @default(PENDING_UPLOAD)
+  // { language, segments: [{ start?, end?, speaker?, text }] } once READY.
+  transcript   Json?
+  // Why processing failed, shown to the owner. Set only when FAILED.
+  error        String?
   createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
 

@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { CompleteMeetingFileUploadCommand } from './commands/complete-meeting-file-upload/complete-meeting-file-upload.command.js';
 import { CreateMeetingFileCommand } from './commands/create-meeting-file/create-meeting-file.command.js';
 import { DeleteMeetingFileCommand } from './commands/delete-meeting-file/delete-meeting-file.command.js';
+import { RetryMeetingFileCommand } from './commands/retry-meeting-file/retry-meeting-file.command.js';
 import { CreateMeetingFileDto } from './dto/create-meeting-file.dto.js';
 import type { CreatedUploadDto } from './dto/created-upload.dto.js';
 import type { MeetingFileDto } from './dto/meeting-file.dto.js';
@@ -37,6 +38,17 @@ export class MeetingFilesController {
     return this.commandBus.execute(
       new CompleteMeetingFileUploadCommand(fileId, meetingId, user.id),
     );
+  }
+
+  // Sends a file whose processing failed back to the queue (409 otherwise).
+  @Post(':fileId/retry')
+  @HttpCode(200)
+  retry(
+    @CurrentUser() user: AuthUser,
+    @Param('meetingId') meetingId: string,
+    @Param('fileId') fileId: string,
+  ): Promise<MeetingFileDto> {
+    return this.commandBus.execute(new RetryMeetingFileCommand(fileId, meetingId, user.id));
   }
 
   // Removes the file and its stored object, in any state.

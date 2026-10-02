@@ -1,20 +1,25 @@
 'use client';
 
-import { ArrowDownToLine, TrashBin } from '@gravity-ui/icons';
+import { ArrowDownToLine, ArrowRotateRight, TrashBin } from '@gravity-ui/icons';
 import { AlertDialog, Alert, Button, Chip, Spinner } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import type { ListedMeetingFile } from '@/lib/meetings';
+import { retryFile } from './actions';
 import { FileRow } from './file-row';
+import { TranscriptView } from './transcript-view';
 
-// A confirmed file: Play (or Open, for a transcript), Download and Delete.
+// A confirmed file: Play (or Open, for a ready transcript), Download and
+// Delete, with its processing status. A failed file shows why and a Retry.
 export function ListedFile({
+  meetingId,
   file,
   isOpen,
   onToggle,
   onDelete,
 }: {
+  meetingId: string;
   file: ListedMeetingFile;
   isOpen: boolean;
   onToggle: () => void;
@@ -22,18 +27,17 @@ export function ListedFile({
 }) {
   const panelId = `file-${file.id}-panel`;
   const isRecording = file.kind === 'RECORDING';
+  // A transcript opens once it is parsed; a recording plays in any state.
+  const canOpen = isRecording || (file.status === 'READY' && file.transcript !== null);
   return (
     <FileRow
       below={
-        isOpen ? (
+        isOpen && canOpen ? (
           <div className="mt-3" id={panelId}>
             {isRecording ? (
               <Player file={file} />
             ) : (
-              <p className="rounded-xl bg-surface-secondary px-4 py-3 text-sm text-muted">
-                Reading transcripts here comes once processing is added. For now, download the file
-                to read it.
-              </p>
+              <TranscriptView name={file.name} transcript={file.transcript!} />
             )}
           </div>
         ) : null
@@ -41,24 +45,23 @@ export function ListedFile({
       kind={file.kind}
       mimeType={file.mimeType}
       name={file.name}
+      note={file.status === 'FAILED' ? <FailedNote file={file} meetingId={meetingId} /> : undefined}
       size={file.size}
-      status={
-        <Chip size="sm" variant="soft">
-          Queued
-        </Chip>
-      }
+      status={<StatusChip file={file} />}
     >
       <div className="flex shrink-0 items-center">
-        <Button
-          aria-controls={isOpen ? panelId : undefined}
-          aria-expanded={isOpen}
-          className="h-11"
-          size="sm"
-          variant="ghost"
-          onPress={onToggle}
-        >
-          {isRecording ? (isOpen ? 'Hide' : 'Play') : isOpen ? 'Close' : 'Open'}
-        </Button>
+        {canOpen ? (
+          <Button
+            aria-controls={isOpen ? panelId : undefined}
+            aria-expanded={isOpen}
+            className="h-11"
+            size="sm"
+            variant="ghost"
+            onPress={onToggle}
+          >
+            {isRecording ? (isOpen ? 'Hide' : 'Play') : isOpen ? 'Close' : 'Open'}
+          </Button>
+        ) : null}
         {/* A link, so the browser saves it; storage sends it as an attachment. */}
         <a
           aria-label={`Download ${file.name}`}
@@ -85,6 +88,67 @@ export function ListedFile({
         </Button>
       </div>
     </FileRow>
+  );
+}
+
+function StatusChip({ file }: { file: ListedMeetingFile }) {
+  if (file.status === 'READY') {
+    return (
+      <Chip color="success" size="sm" variant="soft">
+        Ready
+      </Chip>
+    );
+  }
+  if (file.status === 'FAILED') {
+    return (
+      <Chip color="danger" size="sm" variant="soft">
+        Failed
+      </Chip>
+    );
+  }
+  // Transcripts are being parsed; recordings wait for transcription (#16).
+  return file.kind === 'TRANSCRIPT' ? (
+    <Chip size="sm" variant="soft">
+      <Spinner aria-hidden color="current" size="sm" />
+      Processing
+    </Chip>
+  ) : (
+    <Chip size="sm" variant="soft">
+      Queued
+    </Chip>
+  );
+}
+
+// Why processing failed, and a Retry that sends the file back to the queue.
+function FailedNote({ meetingId, file }: { meetingId: string; file: ListedMeetingFile }) {
+  const router = useRouter();
+  const [isPending, startRetry] = useTransition();
+  const [retryError, setRetryError] = useState<string | null>(null);
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <span className="text-danger">{retryError ?? file.error ?? 'Processing failed.'}</span>
+      <Button
+        className="-ml-2 h-11"
+        isPending={isPending}
+        size="sm"
+        variant="ghost"
+        onPress={() =>
+          startRetry(async () => {
+            const result = await retryFile(meetingId, file.id);
+            if (result.ok) {
+              setRetryError(null);
+              router.refresh();
+            } else {
+              setRetryError(result.error);
+            }
+          })
+        }
+      >
+        {isPending ? <Spinner color="current" size="sm" /> : <ArrowRotateRight aria-hidden />}
+        Retry
+      </Button>
+    </div>
   );
 }
 
