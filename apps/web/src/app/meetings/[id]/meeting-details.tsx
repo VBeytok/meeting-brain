@@ -39,7 +39,7 @@ export async function MeetingDetails({ session, id }: { session: Session; id: st
           <h1 className="text-3xl font-semibold tracking-tight break-words">{meeting.title}</h1>
           <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-muted">
             <time dateTime={meeting.date}>{dateTimeFormat.format(new Date(meeting.date))}</time>
-            <MeetingStatusChip isUpcoming={upcoming} />
+            <MeetingStatusChip upcoming={upcoming} />
           </p>
         </div>
       </header>
@@ -74,8 +74,9 @@ export async function MeetingDetails({ session, id }: { session: Session; id: st
         >
           {meeting.participants.length > 0 ? (
             <ul className="flex flex-col gap-2">
-              {meeting.participants.map((email) => (
-                <li key={email} className="truncate text-sm" title={email}>
+              {/* The API does not de-duplicate participants, so the index keeps keys unique. */}
+              {meeting.participants.map((email, i) => (
+                <li key={`${i}-${email}`} className="truncate text-sm" title={email}>
                   {email}
                 </li>
               ))}

@@ -55,7 +55,7 @@ export async function Dashboard({ session, createdId }: { session: Session; crea
           <ul className="mt-4 flex flex-col gap-3">
             {latest.map(({ meeting, upcoming }) => (
               <li key={meeting.id}>
-                <MeetingRow isUpcoming={upcoming} meeting={meeting} />
+                <MeetingRow meeting={meeting} upcoming={upcoming} />
               </li>
             ))}
           </ul>
@@ -110,7 +110,7 @@ function Kpi({
 }
 
 // The whole card links to the meeting page.
-function MeetingRow({ meeting, isUpcoming }: { meeting: Meeting; isUpcoming: boolean }) {
+function MeetingRow({ meeting, upcoming }: { meeting: Meeting; upcoming: boolean }) {
   return (
     <NextLink
       className="group block rounded-3xl focus-visible:focus-ring"
@@ -135,7 +135,7 @@ function MeetingRow({ meeting, isUpcoming }: { meeting: Meeting; isUpcoming: boo
               </p>
             ) : null}
           </div>
-          <MeetingStatusChip className="shrink-0" isUpcoming={isUpcoming} />
+          <MeetingStatusChip className="shrink-0" upcoming={upcoming} />
         </div>
         <ChevronRight aria-hidden className="size-4 shrink-0 self-center text-muted" />
       </Card>

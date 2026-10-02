@@ -37,10 +37,19 @@ export async function getMeetings(session: Session): Promise<Meeting[] | null> {
 export type MeetingResult =
   { status: 'found'; meeting: Meeting } | { status: 'not-found' } | { status: 'error' };
 
+// Any UUID, like the API's isUUID check on meeting ids.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // One of the caller's meetings. The API answers 404 for a missing id, a
 // malformed id and another user's meeting alike. Cached per request, so the
 // page and its metadata share one call. A rejected token redirects to /login.
 export const getMeeting = cache(async (session: Session, id: string): Promise<MeetingResult> => {
+  // Not just a shortcut: an id of ".." would survive encodeURIComponent and
+  // turn /meetings/.. into a call to the API's root.
+  if (!UUID.test(id)) {
+    return { status: 'not-found' };
+  }
+
   let response: Response;
   try {
     response = await fetch(`${API_URL}/meetings/${encodeURIComponent(id)}`, {
@@ -60,5 +69,6 @@ export const getMeeting = cache(async (session: Session, id: string): Promise<Me
   if (!response.ok) {
     return { status: 'error' };
   }
-  return { status: 'found', meeting: (await response.json()) as Meeting };
+  const meeting = (await response.json().catch(() => null)) as Meeting | null;
+  return meeting ? { status: 'found', meeting } : { status: 'error' };
 });

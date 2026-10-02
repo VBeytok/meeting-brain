@@ -19,15 +19,15 @@ export function MeetingDateBadge({ date, className = '' }: { date: string; class
 }
 
 export function MeetingStatusChip({
-  isUpcoming,
+  upcoming,
   className = '',
 }: {
-  isUpcoming: boolean;
+  upcoming: boolean;
   className?: string;
 }) {
   return (
-    <Chip className={className} color={isUpcoming ? 'accent' : 'default'} size="sm" variant="soft">
-      {isUpcoming ? 'Upcoming' : 'Held'}
+    <Chip className={className} color={upcoming ? 'accent' : 'default'} size="sm" variant="soft">
+      {upcoming ? 'Upcoming' : 'Held'}
     </Chip>
   );
 }
