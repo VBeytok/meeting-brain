@@ -1,4 +1,5 @@
-// A parsed transcript, stored as JSONB on the file and sent to the web app.
+// A parsed transcript file or a transcribed recording, stored as JSONB on the
+// file and sent to the web app.
 export type TranscriptSegment = {
   // Seconds from the start. Absent for plain text, which has no timing.
   start?: number;
@@ -8,7 +9,8 @@ export type TranscriptSegment = {
 };
 
 export type Transcript = {
-  // BCP 47 tag when the file states it (a WebVTT `Language:` header), else null.
+  // BCP 47 tag when known: a WebVTT `Language:` header, or the language the
+  // transcription provider detected. Otherwise null.
   language: string | null;
   segments: TranscriptSegment[];
 };

@@ -1,17 +1,13 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { CommandHandler, type ICommandHandler } from '@nestjs/cqrs';
 import { isUUID } from 'class-validator';
-import { MeetingFileKind, MeetingFileStatus } from '../../../generated/prisma/client.js';
+import { MeetingFileStatus } from '../../../generated/prisma/client.js';
 import { JobQueue } from '../../../queue/job-queue.js';
 import { FileStorage } from '../../../storage/file-storage.js';
 import type { MeetingFileDto } from '../../dto/meeting-file.dto.js';
 import { normalizeMimeType } from '../../file-types.js';
 import { MeetingFilesRepository, withoutStorageKey } from '../../meeting-files.repository.js';
-import {
-  PROCESS_FILE_QUEUE,
-  processFileOptions,
-  type ProcessFileJob,
-} from '../../processing/process-file-queue.js';
+import { PROCESS_FILE_QUEUE, type ProcessFileJob } from '../../processing/process-file-queue.js';
 import { CompleteMeetingFileUploadCommand } from './complete-meeting-file-upload.command.js';
 
 // Confirms an upload: the object must be in storage with the size and type
@@ -56,12 +52,8 @@ export class CompleteMeetingFileUploadHandler implements ICommandHandler<Complet
 
     // null when a concurrent complete queued it first; that call sends the job.
     const queued = await this.files.markQueued(file.id);
-    if (queued?.kind === MeetingFileKind.TRANSCRIPT) {
-      await this.queue.send<ProcessFileJob>(
-        PROCESS_FILE_QUEUE,
-        { fileId: queued.id },
-        processFileOptions(queued.id),
-      );
+    if (queued) {
+      await this.queue.send<ProcessFileJob>(PROCESS_FILE_QUEUE, { fileId: queued.id });
     }
     return withoutStorageKey(queued ?? (await this.files.findOne(file.id)) ?? file);
   }

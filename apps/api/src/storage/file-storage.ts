@@ -1,3 +1,5 @@
+import type { Readable } from 'node:stream';
+
 export type StoredObject = {
   size: number;
   contentType: string | undefined;
@@ -27,6 +29,10 @@ export abstract class FileStorage {
   // The whole object, or null when there is none. For small files only: it
   // holds the bytes in memory.
   abstract read(key: string): Promise<Uint8Array | null>;
+
+  // A stream of the object's bytes, or null when there is none. For files of
+  // any size; the caller must consume or destroy the stream.
+  abstract openRead(key: string): Promise<Readable | null>;
 
   // Removes the object. Succeeds when it is already gone.
   abstract delete(key: string): Promise<void>;

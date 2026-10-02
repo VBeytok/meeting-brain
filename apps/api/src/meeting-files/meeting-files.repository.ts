@@ -17,8 +17,15 @@ type NewMeetingFile = {
   kind: MeetingFileKind;
 };
 
-// The stored record, with the storage key the API keeps to itself.
-export type StoredMeetingFile = MeetingFileDto & { storageKey: string };
+// The stored record, with the storage key and the transcription provider's
+// job id, which the API keeps to itself.
+export type StoredMeetingFile = MeetingFileDto & {
+  storageKey: string;
+  transcriptionId: string | null;
+};
+
+// Statuses a file is processed from: QUEUED, and TRANSCRIBING for recordings.
+const IN_PROGRESS = [MeetingFileStatus.QUEUED, MeetingFileStatus.TRANSCRIBING];
 
 const toDto = (file: MeetingFile): StoredMeetingFile => ({
   id: file.id,
@@ -32,6 +39,7 @@ const toDto = (file: MeetingFile): StoredMeetingFile => ({
   error: file.error,
   createdAt: file.createdAt.toISOString(),
   storageKey: file.storageKey,
+  transcriptionId: file.transcriptionId,
 });
 
 export function withoutStorageKey(file: StoredMeetingFile): MeetingFileDto {
@@ -101,21 +109,31 @@ export class MeetingFilesRepository {
     await this.prisma.meetingFile.deleteMany({ where: { id } });
   }
 
-  // QUEUED → READY with the parsed transcript. False when the file is no
-  // longer QUEUED (deleted, or handled by another attempt).
-  async markReady(id: string, transcript: Transcript): Promise<boolean> {
+  // QUEUED → TRANSCRIBING, keeping the provider's job id. False when the
+  // file is no longer QUEUED (deleted, or handled by another attempt).
+  async markTranscribing(id: string, transcriptionId: string): Promise<boolean> {
     const { count } = await this.prisma.meetingFile.updateMany({
       where: { id, status: MeetingFileStatus.QUEUED },
-      data: { status: MeetingFileStatus.READY, transcript, error: null },
+      data: { status: MeetingFileStatus.TRANSCRIBING, transcriptionId },
     });
     return count > 0;
   }
 
-  // QUEUED → FAILED with a message for the owner.
+  // QUEUED or TRANSCRIBING → READY with the transcript. False when the file
+  // is no longer in progress (deleted, or handled by another attempt).
+  async markReady(id: string, transcript: Transcript): Promise<boolean> {
+    const { count } = await this.prisma.meetingFile.updateMany({
+      where: { id, status: { in: IN_PROGRESS } },
+      data: { status: MeetingFileStatus.READY, transcript, error: null, transcriptionId: null },
+    });
+    return count > 0;
+  }
+
+  // QUEUED or TRANSCRIBING → FAILED with a message for the owner.
   async markFailed(id: string, error: string): Promise<boolean> {
     const { count } = await this.prisma.meetingFile.updateMany({
-      where: { id, status: MeetingFileStatus.QUEUED },
-      data: { status: MeetingFileStatus.FAILED, error },
+      where: { id, status: { in: IN_PROGRESS } },
+      data: { status: MeetingFileStatus.FAILED, error, transcriptionId: null },
     });
     return count > 0;
   }

@@ -3,6 +3,8 @@ import { AuthModule } from '../auth/auth.module.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { QueueModule } from '../queue/queue.module.js';
 import { StorageModule } from '../storage/storage.module.js';
+import { TranscriptionModule } from '../transcription/transcription.module.js';
+import { CheckTranscriptionHandler } from './commands/check-transcription/check-transcription.handler.js';
 import { CompleteMeetingFileUploadHandler } from './commands/complete-meeting-file-upload/complete-meeting-file-upload.handler.js';
 import { CreateMeetingFileHandler } from './commands/create-meeting-file/create-meeting-file.handler.js';
 import { DeleteMeetingFileHandler } from './commands/delete-meeting-file/delete-meeting-file.handler.js';
@@ -15,7 +17,7 @@ import { ListMeetingFilesHandler } from './queries/list-meeting-files/list-meeti
 
 // Files attached to meetings. Reaches meetings only through the buses.
 @Module({
-  imports: [AuthModule, PrismaModule, QueueModule, StorageModule],
+  imports: [AuthModule, PrismaModule, QueueModule, StorageModule, TranscriptionModule],
   controllers: [MeetingFilesController],
   providers: [
     MeetingFilesRepository,
@@ -23,6 +25,7 @@ import { ListMeetingFilesHandler } from './queries/list-meeting-files/list-meeti
     CompleteMeetingFileUploadHandler,
     DeleteMeetingFileHandler,
     ProcessMeetingFileHandler,
+    CheckTranscriptionHandler,
     RetryMeetingFileHandler,
     MeetingFileProcessor,
     ListMeetingFilesHandler,

@@ -35,6 +35,11 @@ const MEETING = {
 };
 const AUDIO = Buffer.from('ID3 not really an mp3, but storage does not care');
 
+// Recordings go to FakeTranscriber, which answers at once, whatever .env says.
+// Set before AppModule loads its config; .env does not override them.
+process.env.ASSEMBLYAI_API_KEY = '';
+process.env.FAKE_TRANSCRIPTION_DELAY_SECONDS = '0';
+
 describe('Meeting files (e2e)', () => {
   let app: INestApplication<App>;
   let s3: S3Client;
@@ -356,15 +361,15 @@ describe('Meeting files (e2e)', () => {
     return upload.file.id;
   }
 
-  // Polls the meeting until the file leaves QUEUED, as the web app does.
+  // Polls the meeting until the file is READY or FAILED, as the web app does.
   async function settled(token: string, meetingId: string, fileId: string): Promise<ListedFile> {
     for (let i = 0; i < 100; i++) {
       const meeting = await getMeeting(token, meetingId).expect(200);
       const file = (meeting.body as { files: ListedFile[] }).files.find((f) => f.id === fileId);
-      if (file && file.status !== 'QUEUED') return file;
+      if (file && file.status !== 'QUEUED' && file.status !== 'TRANSCRIBING') return file;
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
-    throw new Error(`File ${fileId} is still QUEUED`);
+    throw new Error(`File ${fileId} is still in progress`);
   }
 
   const retry = (token: string, meetingId: string, fileId: string) =>
@@ -461,18 +466,57 @@ describe('Meeting files (e2e)', () => {
       const upload = await createdUpload(token, meetingId);
       await retry(token, meetingId, upload.file.id).expect(409);
     });
+  });
 
-    it('leaves a recording queued: transcription comes later', async () => {
+  describe('recording transcription', () => {
+    it('transcribes a recording into segments with speaker labels', async () => {
       const token = await signUp();
       const meetingId = await createMeeting(token);
-      const file = await queuedFile(token, meetingId);
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      const meeting = await getMeeting(token, meetingId).expect(200);
-      expect((meeting.body as { files: ListedFile[] }).files[0]).toMatchObject({
-        id: file.id,
-        status: 'QUEUED',
-        transcript: null,
+      const { id } = await queuedFile(token, meetingId);
+
+      const file = await settled(token, meetingId, id);
+      expect(file).toMatchObject({ status: 'READY', error: null, kind: 'RECORDING' });
+      expect(file.transcript?.language).toBe('en');
+      expect(file.transcript?.segments.length).toBeGreaterThan(0);
+      expect(file.transcript?.segments[0]).toEqual({
+        start: 0,
+        end: expect.any(Number) as number,
+        speaker: 'Speaker A',
+        text: expect.any(String) as string,
       });
+    });
+
+    it('fails when the provider fails, and a retry transcribes it again', async () => {
+      const token = await signUp();
+      const meetingId = await createMeeting(token);
+      // The fake fails a recording whose bytes start with its marker.
+      const broken = Buffer.from('FAKE_TRANSCRIPTION_FAILURE and then some audio');
+      const upload = await createdUpload(token, meetingId, {
+        name: 'call.m4a',
+        mimeType: 'audio/mp4',
+        size: broken.length,
+      });
+      await put(upload, broken);
+      await complete(token, meetingId, upload.file.id).expect(200);
+
+      const failed = await settled(token, meetingId, upload.file.id);
+      expect(failed).toMatchObject({ status: 'FAILED', transcript: null });
+      expect(failed.error).toMatch(/^Transcription failed: /);
+
+      // Replace the bytes with ones the fake accepts, then retry.
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: storageKey(upload),
+          Body: Buffer.from('x'.repeat(broken.length)),
+          ContentType: 'audio/mp4',
+        }),
+      );
+      const retried = await retry(token, meetingId, upload.file.id).expect(200);
+      expect(retried.body).toMatchObject({ status: 'QUEUED', error: null });
+      const ready = await settled(token, meetingId, upload.file.id);
+      expect(ready).toMatchObject({ status: 'READY', error: null });
+      expect(ready.transcript?.segments.length).toBeGreaterThan(0);
     });
 
     it("answers 401 without a token and 404 for another user's file", async () => {
