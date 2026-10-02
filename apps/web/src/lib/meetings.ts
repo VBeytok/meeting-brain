@@ -13,7 +13,8 @@ export interface Meeting {
   participants: string[];
 }
 
-// Mirrors the API's Transcript: what a transcript file is parsed into.
+// Mirrors the API's Transcript: what a transcript file is parsed, or a
+// recording transcribed, into.
 export interface TranscriptSegment {
   // Seconds from the start; absent for plain text.
   start?: number;
@@ -36,7 +37,7 @@ export interface MeetingFile {
   size: number;
   kind: MeetingFileKind;
   // QUEUED waits for processing; READY and FAILED are where it ends.
-  status: 'PENDING_UPLOAD' | 'QUEUED' | 'READY' | 'FAILED';
+  status: 'PENDING_UPLOAD' | 'QUEUED' | 'TRANSCRIBING' | 'READY' | 'FAILED';
   // Set once a transcript file is READY.
   transcript: Transcript | null;
   // Why processing failed, when FAILED.

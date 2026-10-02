@@ -9,7 +9,12 @@ export type QueueSettings = {
   retryDelaySeconds: number;
   // A job still running after this long counts as failed and is retried.
   expireInSeconds: number;
+  // Jobs this process runs at once. Each worker takes one job and then waits
+  // POLLING_SECONDS before the next, so this is also the throughput.
+  concurrency: number;
 };
+
+const POLLING_SECONDS = 1;
 
 // A job as a worker sees it: its data, which attempt this is, and whether it is
 // the last one the queue will make.
@@ -62,8 +67,8 @@ export class JobQueue implements OnModuleInit, OnApplicationShutdown {
     await this.boss.send(name, data, options);
   }
 
-  // Runs `handler` for each job, one at a time. Throwing fails the attempt;
-  // the queue retries it until its retryLimit is used up.
+  // Runs `handler` for each job, up to `concurrency` at a time. Throwing
+  // fails the attempt; the queue retries it until its retryLimit is used up.
   async work<T extends object>(
     name: string,
     handler: (job: QueueJob<T>) => Promise<void>,
@@ -72,7 +77,11 @@ export class JobQueue implements OnModuleInit, OnApplicationShutdown {
     if (!settings) {
       throw new Error(`Define queue "${name}" before working it`);
     }
-    await this.boss.work<T>(name, async ([job]: Job<T>[]) => {
+    const options = {
+      localConcurrency: settings.concurrency,
+      pollingIntervalSeconds: POLLING_SECONDS,
+    };
+    await this.boss.work<T>(name, options, async ([job]: Job<T>[]) => {
       await handler({
         id: job.id,
         data: job.data,

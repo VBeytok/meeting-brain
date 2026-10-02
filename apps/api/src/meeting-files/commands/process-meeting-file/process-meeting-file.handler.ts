@@ -1,8 +1,14 @@
 import { Logger } from '@nestjs/common';
 import { CommandHandler, type ICommandHandler } from '@nestjs/cqrs';
 import { MeetingFileKind, MeetingFileStatus } from '../../../generated/prisma/client.js';
+import { JobQueue } from '../../../queue/job-queue.js';
 import { FileStorage } from '../../../storage/file-storage.js';
-import { MeetingFilesRepository } from '../../meeting-files.repository.js';
+import { Transcriber, TranscriptionRejectedError } from '../../../transcription/transcriber.js';
+import { MeetingFilesRepository, type StoredMeetingFile } from '../../meeting-files.repository.js';
+import {
+  CHECK_TRANSCRIPTION_QUEUE,
+  type CheckTranscriptionJob,
+} from '../../processing/process-file-queue.js';
 import { parseTranscript } from '../../transcripts/parse-transcript.js';
 import { TranscriptParseError } from '../../transcripts/transcript.js';
 import { ProcessMeetingFileCommand } from './process-meeting-file.command.js';
@@ -11,9 +17,12 @@ import { ProcessMeetingFileCommand } from './process-meeting-file.command.js';
 export const MAX_TRANSCRIPT_BYTES = 20 * 1024 * 1024;
 
 const UNEXPECTED = 'Processing failed on our side. Try again.';
+const MISSING = 'The uploaded file is missing from storage.';
 
-// Parses a QUEUED transcript file into READY (with its transcript) or FAILED
-// (with a reason). Throws on trouble worth retrying; the queue retries it.
+// Processes a QUEUED file. A transcript file is parsed into READY (with its
+// transcript) or FAILED (with a reason). A recording is streamed to the
+// transcription provider and becomes TRANSCRIBING; CheckTranscriptionCommand
+// polls it from there. Throws on trouble worth retrying; the queue retries it.
 @CommandHandler(ProcessMeetingFileCommand)
 export class ProcessMeetingFileHandler implements ICommandHandler<ProcessMeetingFileCommand> {
   private readonly logger = new Logger(ProcessMeetingFileHandler.name);
@@ -21,27 +30,28 @@ export class ProcessMeetingFileHandler implements ICommandHandler<ProcessMeeting
   constructor(
     private readonly files: MeetingFilesRepository,
     private readonly storage: FileStorage,
+    private readonly transcriber: Transcriber,
+    private readonly queue: JobQueue,
   ) {}
 
   async execute({ fileId, isLastAttempt }: ProcessMeetingFileCommand): Promise<void> {
     const file = await this.files.findOne(fileId);
-    // Deleted, already processed, or not ours to process yet.
+    // Deleted, or already processed.
     if (!file || file.status !== MeetingFileStatus.QUEUED) return;
-    if (file.kind !== MeetingFileKind.TRANSCRIPT) return;
 
     try {
-      if (file.size > MAX_TRANSCRIPT_BYTES) {
-        throw new TranscriptParseError('Transcript files over 20 MB cannot be read.');
+      if (file.kind === MeetingFileKind.TRANSCRIPT) {
+        await this.parse(file);
+      } else {
+        await this.submit(file);
       }
-      const bytes = await this.storage.read(file.storageKey);
-      if (!bytes) {
-        throw new TranscriptParseError('The uploaded file is missing from storage.');
-      }
-      const transcript = parseTranscript(file.name, decodeUtf8(bytes));
-      await this.files.markReady(file.id, transcript);
     } catch (error) {
       if (error instanceof TranscriptParseError) {
         await this.files.markFailed(file.id, error.message);
+        return;
+      }
+      if (error instanceof TranscriptionRejectedError) {
+        await this.files.markFailed(file.id, `Transcription failed: ${error.message}`);
         return;
       }
       this.logger.error(`Processing file ${file.id} failed`, error);
@@ -51,6 +61,35 @@ export class ProcessMeetingFileHandler implements ICommandHandler<ProcessMeeting
       }
       throw error;
     }
+  }
+
+  private async parse(file: StoredMeetingFile): Promise<void> {
+    if (file.size > MAX_TRANSCRIPT_BYTES) {
+      throw new TranscriptParseError('Transcript files over 20 MB cannot be read.');
+    }
+    const bytes = await this.storage.read(file.storageKey);
+    if (!bytes) {
+      throw new TranscriptParseError(MISSING);
+    }
+    const transcript = parseTranscript(file.name, decodeUtf8(bytes));
+    await this.files.markReady(file.id, transcript);
+  }
+
+  private async submit(file: StoredMeetingFile): Promise<void> {
+    const audio = await this.storage.openRead(file.storageKey);
+    if (!audio) {
+      await this.files.markFailed(file.id, MISSING);
+      return;
+    }
+    const transcriptionId = await this.transcriber.submit(audio);
+    // False when the file was deleted while it uploaded; the provider's job
+    // is then left to finish unread.
+    if (!(await this.files.markTranscribing(file.id, transcriptionId))) return;
+    await this.queue.send<CheckTranscriptionJob>(CHECK_TRANSCRIPTION_QUEUE, {
+      fileId: file.id,
+      transcriptionId,
+      submittedAt: Date.now(),
+    });
   }
 }
 

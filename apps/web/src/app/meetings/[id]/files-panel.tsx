@@ -269,12 +269,11 @@ export function FilesPanel({
 
   const dismiss = (key: string) => setUploads((list) => list.filter((u) => u.key !== key));
 
-  // Re-fetch every 5 seconds while a transcript is being processed, to show
-  // the result; otherwise every 10 minutes while files are listed, to keep
-  // their URLs valid. Recordings stay QUEUED until transcription exists, so
-  // they do not count as processing.
+  // Re-fetch every 5 seconds while a file is being processed (parsed or
+  // transcribed), to show the result; otherwise every 10 minutes while files
+  // are listed, to keep their URLs valid.
   const isProcessing = serverFiles.some(
-    (file) => file.kind === 'TRANSCRIPT' && file.status === 'QUEUED',
+    (file) => file.status === 'QUEUED' || file.status === 'TRANSCRIBING',
   );
   const refreshEvery = isProcessing ? POLL_MS : serverFiles.length > 0 ? URL_REFRESH_MS : null;
   useEffect(() => {

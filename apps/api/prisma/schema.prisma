@@ -47,7 +47,11 @@ enum MeetingFileStatus {
   PENDING_UPLOAD
   // The upload is confirmed and waits for processing.
   QUEUED
-  // Processed: a transcript file is parsed into `transcript`.
+  // A recording handed to the transcription provider; `transcriptionId` is
+  // the provider's job, polled until it finishes.
+  TRANSCRIBING
+  // Processed: a transcript file is parsed, or a recording transcribed, into
+  // `transcript`.
   READY
   // Processing gave up; `error` says why. Retry moves it back to QUEUED.
   FAILED
@@ -56,24 +60,26 @@ enum MeetingFileStatus {
 }
 
 model MeetingFile {
-  id           String            @id @default(uuid(7)) @db.Uuid
-  meetingId    String            @map("meeting_id") @db.Uuid
-  meeting      Meeting           @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  id              String            @id @default(uuid(7)) @db.Uuid
+  meetingId       String            @map("meeting_id") @db.Uuid
+  meeting         Meeting           @relation(fields: [meetingId], references: [id], onDelete: Cascade)
   // meetings/{meetingId}/{id}: one prefix per meeting, so deleting a meeting
   // can clear its objects in one go.
-  storageKey   String            @unique @map("storage_key")
-  originalName String            @map("original_name")
-  mimeType     String            @map("mime_type")
+  storageKey      String            @unique @map("storage_key")
+  originalName    String            @map("original_name")
+  mimeType        String            @map("mime_type")
   // Bytes. Uploads are capped at 1 GB, well inside a 32-bit int.
-  size         Int
-  kind         MeetingFileKind
-  status       MeetingFileStatus @default(PENDING_UPLOAD)
+  size            Int
+  kind            MeetingFileKind
+  status          MeetingFileStatus @default(PENDING_UPLOAD)
   // { language, segments: [{ start?, end?, speaker?, text }] } once READY.
-  transcript   Json?
+  transcript      Json?
   // Why processing failed, shown to the owner. Set only when FAILED.
-  error        String?
-  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  error           String?
+  // The transcription provider's job id while a recording is TRANSCRIBING.
+  transcriptionId String?           @map("transcription_id")
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([meetingId])
   @@map("meeting_files")

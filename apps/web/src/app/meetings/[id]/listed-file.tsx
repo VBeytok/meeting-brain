@@ -4,14 +4,14 @@ import { ArrowDownToLine, ArrowRotateRight, TrashBin } from '@gravity-ui/icons';
 import { AlertDialog, Alert, Button, Chip, Spinner } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { type RefObject, useRef, useState, useTransition } from 'react';
 import type { ListedMeetingFile } from '@/lib/meetings';
 import { retryFile } from './actions';
 import { FileRow } from './file-row';
 import { TranscriptView } from './transcript-view';
 
-// A confirmed file: Play (or Open, for a ready transcript), Download and
-// Delete, with its processing status. A failed file shows why and a Retry.
+// A confirmed file: Play (or Open, for a ready transcript file), Download
+// and Delete, with its processing status. A failed file shows why and a Retry.
 export function ListedFile({
   meetingId,
   file,
@@ -35,7 +35,7 @@ export function ListedFile({
         isOpen && canOpen ? (
           <div className="mt-3" id={panelId}>
             {isRecording ? (
-              <Player file={file} />
+              <RecordingView file={file} />
             ) : (
               <TranscriptView name={file.name} transcript={file.transcript!} />
             )}
@@ -106,16 +106,61 @@ function StatusChip({ file }: { file: ListedMeetingFile }) {
       </Chip>
     );
   }
-  // Transcripts are being parsed; recordings wait for transcription (#16).
-  return file.kind === 'TRANSCRIPT' ? (
+  // QUEUED: a transcript file is about to be parsed, a recording to be sent
+  // for transcription. TRANSCRIBING: the provider is working on it.
+  const label =
+    file.status === 'TRANSCRIBING'
+      ? 'Transcribing'
+      : file.kind === 'TRANSCRIPT'
+        ? 'Processing'
+        : 'Queued';
+  return (
     <Chip size="sm" variant="soft">
       <Spinner aria-hidden color="current" size="sm" />
-      Processing
+      {label}
     </Chip>
-  ) : (
-    <Chip size="sm" variant="soft">
-      Queued
-    </Chip>
+  );
+}
+
+// A recording's player, with its transcript alongside once it is READY:
+// clicking a line seeks there, and the line being spoken is highlighted.
+// Video and transcript sit side by side on wide screens; audio's player is a
+// single bar, so its transcript goes underneath.
+function RecordingView({ file }: { file: ListedMeetingFile }) {
+  const mediaRef = useRef<HTMLMediaElement>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const isVideo = file.mimeType.startsWith('video/');
+  const transcript = file.status === 'READY' ? file.transcript : null;
+
+  const seek = (seconds: number) => {
+    const media = mediaRef.current;
+    if (!media) return;
+    media.currentTime = seconds;
+    setCurrentTime(seconds);
+    // Autoplay rules may refuse; the seek still happened.
+    media.play().catch(() => undefined);
+  };
+
+  return (
+    <div
+      className={
+        isVideo && transcript
+          ? 'grid gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start'
+          : 'flex flex-col gap-3'
+      }
+    >
+      <Player file={file} mediaRef={mediaRef} onTimeUpdate={setCurrentTime} />
+      {transcript ? (
+        <TranscriptView
+          currentTime={currentTime}
+          name={file.name}
+          transcript={transcript}
+          onSeek={seek}
+        />
+      ) : file.status === 'QUEUED' || file.status === 'TRANSCRIBING' ? (
+        <p className="text-sm text-muted">The transcript appears here once it is ready.</p>
+      ) : null}
+    </div>
   );
 }
 
@@ -155,7 +200,15 @@ function FailedNote({ meetingId, file }: { meetingId: string; file: ListedMeetin
 // <audio> or <video> by type. Keeps the URL it opened with, so a refresh of
 // the page (which signs new URLs) does not restart playback; on an error it
 // moves to the newest URL once, which also gets past an expired link.
-function Player({ file }: { file: ListedMeetingFile }) {
+function Player({
+  file,
+  mediaRef,
+  onTimeUpdate,
+}: {
+  file: ListedMeetingFile;
+  mediaRef: RefObject<HTMLMediaElement | null>;
+  onTimeUpdate: (seconds: number) => void;
+}) {
   const router = useRouter();
   const [src, setSrc] = useState(file.playbackUrl);
   const [failed, setFailed] = useState(false);
@@ -204,6 +257,7 @@ function Player({ file }: { file: ListedMeetingFile }) {
   return file.mimeType.startsWith('video/') ? (
     <video
       key={src}
+      ref={mediaRef as RefObject<HTMLVideoElement | null>}
       controls
       playsInline
       aria-label={file.name}
@@ -211,16 +265,19 @@ function Player({ file }: { file: ListedMeetingFile }) {
       preload="metadata"
       src={src}
       onError={onError}
+      onTimeUpdate={(event) => onTimeUpdate(event.currentTarget.currentTime)}
     />
   ) : (
     <audio
       key={src}
+      ref={mediaRef as RefObject<HTMLAudioElement | null>}
       controls
       aria-label={file.name}
       className="w-full"
       preload="metadata"
       src={src}
       onError={onError}
+      onTimeUpdate={(event) => onTimeUpdate(event.currentTarget.currentTime)}
     />
   );
 }
