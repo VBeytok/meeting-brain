@@ -67,6 +67,13 @@ export class JobQueue implements OnModuleInit, OnApplicationShutdown {
     this.settings.set(name, settings);
   }
 
+  // Sends a job to `name` on a cron schedule (UTC), e.g. '0 * * * *' for hourly.
+  // Scheduling again replaces the schedule, so every start may call it. The
+  // queue must be defined first.
+  async schedule(name: string, cron: string): Promise<void> {
+    await this.boss.schedule(name, cron);
+  }
+
   async send<T extends object>(name: string, data: T, options?: SendOptions): Promise<void> {
     await this.boss.send(name, data, options);
   }

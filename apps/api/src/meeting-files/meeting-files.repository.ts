@@ -158,6 +158,25 @@ export class MeetingFilesRepository {
     return files.map(toDto);
   }
 
+  // Uploads that were registered before `before` and never completed.
+  async findAbandoned(before: Date, limit: number): Promise<StoredMeetingFile[]> {
+    const files = await this.prisma.meetingFile.findMany({
+      where: { status: MeetingFileStatus.PENDING_UPLOAD, createdAt: { lt: before } },
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+    });
+    return files.map(toDto);
+  }
+
+  // Removes a row only while it is still pending, so a file that was
+  // completed meanwhile is kept. False when it was not.
+  async deletePending(id: string): Promise<boolean> {
+    const { count } = await this.prisma.meetingFile.deleteMany({
+      where: { id, status: MeetingFileStatus.PENDING_UPLOAD },
+    });
+    return count > 0;
+  }
+
   async findOne(id: string): Promise<StoredMeetingFile | null> {
     const file = await this.prisma.meetingFile.findUnique({ where: { id } });
     return file && toDto(file);
