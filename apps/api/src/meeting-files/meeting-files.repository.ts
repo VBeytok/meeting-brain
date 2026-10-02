@@ -6,6 +6,7 @@ import {
 } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { MeetingFileDto } from './dto/meeting-file.dto.js';
+import type { Transcript } from './transcripts/transcript.js';
 
 type NewMeetingFile = {
   meetingId: string;
@@ -26,13 +27,16 @@ const toDto = (file: MeetingFile): StoredMeetingFile => ({
   size: file.size,
   kind: file.kind,
   status: file.status,
+  // Written only by markReady, so the shape is known.
+  transcript: file.transcript as Transcript | null,
+  error: file.error,
   createdAt: file.createdAt.toISOString(),
   storageKey: file.storageKey,
 });
 
 export function withoutStorageKey(file: StoredMeetingFile): MeetingFileDto {
-  const { id, name, mimeType, size, kind, status, createdAt } = file;
-  return { id, name, mimeType, size, kind, status, createdAt };
+  const { id, name, mimeType, size, kind, status, transcript, error, createdAt } = file;
+  return { id, name, mimeType, size, kind, status, transcript, error, createdAt };
 }
 
 // Data access for meeting_files. Reads on behalf of a user are scoped to the
@@ -95,6 +99,34 @@ export class MeetingFilesRepository {
   // deleteMany, so a row a concurrent request already removed is not an error.
   async delete(id: string): Promise<void> {
     await this.prisma.meetingFile.deleteMany({ where: { id } });
+  }
+
+  // QUEUED → READY with the parsed transcript. False when the file is no
+  // longer QUEUED (deleted, or handled by another attempt).
+  async markReady(id: string, transcript: Transcript): Promise<boolean> {
+    const { count } = await this.prisma.meetingFile.updateMany({
+      where: { id, status: MeetingFileStatus.QUEUED },
+      data: { status: MeetingFileStatus.READY, transcript, error: null },
+    });
+    return count > 0;
+  }
+
+  // QUEUED → FAILED with a message for the owner.
+  async markFailed(id: string, error: string): Promise<boolean> {
+    const { count } = await this.prisma.meetingFile.updateMany({
+      where: { id, status: MeetingFileStatus.QUEUED },
+      data: { status: MeetingFileStatus.FAILED, error },
+    });
+    return count > 0;
+  }
+
+  // FAILED → QUEUED, clearing the error. False when it was not FAILED.
+  async requeue(id: string): Promise<boolean> {
+    const { count } = await this.prisma.meetingFile.updateMany({
+      where: { id, status: MeetingFileStatus.FAILED },
+      data: { status: MeetingFileStatus.QUEUED, error: null },
+    });
+    return count > 0;
   }
 
   async findOne(id: string): Promise<StoredMeetingFile | null> {

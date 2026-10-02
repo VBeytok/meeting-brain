@@ -24,6 +24,10 @@ export abstract class FileStorage {
   // Size and type of a stored object, or null when there is none.
   abstract head(key: string): Promise<StoredObject | null>;
 
+  // The whole object, or null when there is none. For small files only: it
+  // holds the bytes in memory.
+  abstract read(key: string): Promise<Uint8Array | null>;
+
   // Removes the object. Succeeds when it is already gone.
   abstract delete(key: string): Promise<void>;
 }
